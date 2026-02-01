@@ -1,4 +1,4 @@
-Capstone Project E-Learning Mobile App
+**Capstone Project E-Learning Mobile App**
 
 The E-Learning Mobile App is designed for college students to access learning materials such as lessons, quizzes, and Augmented Reality (AR) learning experiences through a mobile platform. The beta phase aims to evaluate the app’s functionality, usability, performance, and overall learning experience before the final release.
 
