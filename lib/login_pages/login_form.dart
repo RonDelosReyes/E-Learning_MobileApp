@@ -1,6 +1,8 @@
 import 'package:e_learning_app/login_pages/register_form.dart';
 import 'package:flutter/material.dart';
 import '../services/login/login_function.dart';
+import '../services/login/login_otp.dart';
+
 
 class LogInForm extends StatefulWidget {
   const LogInForm({super.key});
@@ -176,11 +178,17 @@ class _LogInFormState extends State<LogInForm> {
                         onTap: _isLoading ? null : () async {
                           setState(() => _isLoading = true);
 
-                          await LoginController().handleLogin(
+                          //Attempt login
+                          final success = await LoginController().handleLogin(
                             context: context,
                             email: emailController.text.trim(),
                             password: passwordController.text,
                           );
+
+                          //Trigger OTP modal if status_no == 3
+                            await LoginOtpHandler(
+                              email: emailController.text.trim(),
+                            ).checkAndTriggerOtp(context);
 
                           if (mounted) setState(() => _isLoading = false);
                         },

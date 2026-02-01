@@ -1,10 +1,17 @@
 import '../../db_connect.dart';
 import '../otp_service_email.dart';
+import 'dart:convert'; // for utf8
+import 'package:crypto/crypto.dart';
 
 class RegistrationService {
   final OtpService otpService;
 
   RegistrationService({required this.otpService});
+
+  //Hash password
+  String _hashPassword(String password) {
+    return sha256.convert(utf8.encode(password)).toString();
+  }
 
   // Register Student
   Future<bool> registerStudent({
@@ -18,28 +25,30 @@ class RegistrationService {
     required String yearLevel,
   }) async {
     try {
-      // 1️⃣ Insert user into tbl_user (keep bigint user_id)
+      final hashedPassword = _hashPassword(password);
+
+      //Insert user
       final userRes = await supabase.from('tbl_user').insert({
         'firstName': firstName,
         'middleInitial': middleInitial,
         'lastName': lastName,
         'contact_no': contactNo,
         'email': email,
-        'password_hash': password,
-        'status_no': 3, // pending OTP verification
+        'password_hash': hashedPassword,
+        'status_no': 3, // pending OTP
         'date_created': DateTime.now().toIso8601String(),
       }).select().single();
 
       final int userId = userRes['user_id'];
 
-      // 2️⃣ Insert student linked to user
+      //Insert student
       await supabase.from('tbl_student').insert({
         'user_no': userId,
         'student_num': studentNum,
         'year_level': yearLevel,
       });
 
-      // 3️⃣ Send OTP
+      //Send OTP
       return await otpService.sendOtp(email);
     } catch (e) {
       print('Student registration failed: $e');
@@ -59,28 +68,30 @@ class RegistrationService {
     required String specialization,
   }) async {
     try {
-      // 1️⃣ Insert user into tbl_user
+      final hashedPassword = _hashPassword(password);
+
+      //Insert user
       final userRes = await supabase.from('tbl_user').insert({
         'firstName': firstName,
         'middleInitial': middleInitial,
         'lastName': lastName,
         'contact_no': contactNo,
         'email': email,
-        'password_hash': password,
-        'status_no': 3, // pending OTP verification
+        'password_hash': hashedPassword,
+        'status_no': 3,
         'date_created': DateTime.now().toIso8601String(),
       }).select().single();
 
       final int userId = userRes['user_id'];
 
-      // 2️⃣ Insert faculty linked to user
+      //Insert faculty
       await supabase.from('tbl_faculty').insert({
         'user_no': userId,
         'department': department,
         'specialization': specialization,
       });
 
-      // 3️⃣ Send OTP
+      //Send OTP
       return await otpService.sendOtp(email);
     } catch (e) {
       print('Faculty registration failed: $e');
@@ -88,7 +99,7 @@ class RegistrationService {
     }
   }
 
-  // ✅ Optional: Update status_no after OTP verification
+  // Mark user verified after OTP
   Future<bool> markUserVerified(String email) async {
     try {
       final userRes = await supabase
