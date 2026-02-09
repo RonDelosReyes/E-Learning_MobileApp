@@ -1,26 +1,28 @@
-import 'package:e_learning_app/admin/a_dashboard_page.dart';
-import 'package:e_learning_app/faculty/f_dashboard_page.dart';
-import 'package:e_learning_app/login_pages/login_form.dart';
 import 'package:e_learning_app/db_connect.dart';
-import 'package:e_learning_app/pages/dashboard_page.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+
 import 'user_provider.dart';
+import 'app_entry.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Force portrait mode
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  // Force portrait ONLY on mobile
+  if (defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS) {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  }
 
-  //Supabase Initialization
+  // Supabase Initialization
   try {
     await initSupabase();
-    debugPrint("Connected."); 
+    debugPrint("Connected.");
   } catch (e) {
     debugPrint("Supabase Initialization Failed: $e");
   }
@@ -44,7 +46,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'E-Learning App',
       theme: ThemeData(primarySwatch: Colors.lightBlue),
-      home: const LogInForm(),
+      home: const AppEntry(),
     );
   }
 }
