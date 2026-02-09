@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../admin/a_dashboard_page.dart';
 import '../../db_connect.dart';
 import '../../faculty/f_dashboard_page.dart';
 import '../../login_pages/otp_modal.dart';
 import '../../pages/dashboard_page.dart';
 import '../../user_provider.dart';
+
 import '../auth_service.dart';
 import '../otp_service_email.dart';
+import '../pages/profile_service.dart';
 
 class LoginController {
-  bool _otpDialogOpen = false; //prevent duplicate OTP dialogs
+  bool _otpDialogOpen = false; // prevent duplicate OTP dialogs
 
   Future<void> handleLogin({
     required BuildContext context,
@@ -54,7 +57,6 @@ class LoginController {
           onVerified: (verified) async {
             if (!verified) return;
 
-            // Update status ONLY
             await supabase
                 .from('tbl_user')
                 .update({'status_no': 1})
@@ -65,18 +67,14 @@ class LoginController {
         ),
       );
 
-      // After dialog closes, STOP login flow
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Account verified. Please login again."),
         ),
       );
-
       return;
     }
 
-
-    //INACTIVE
     if (statusNo == 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -88,7 +86,6 @@ class LoginController {
       return;
     }
 
-    //UNKNOWN STATUS
     if (statusNo != 1) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Invalid account status.")),
@@ -122,6 +119,12 @@ class LoginController {
       "date_created": user['date_created'] ?? user['date_joined'],
     };
 
+    // ---------- FETCH PROFILE IMAGE (ONCE) ----------
+    final profileService = ProfileService();
+    final profile = await profileService.fetchProfileFile(
+      userId: user["user_id"],
+    );
+
     // ---------- ADMIN ----------
     if (isAdmin) {
       final a = loginData['tbl_admin'][0];
@@ -131,6 +134,8 @@ class LoginController {
       });
 
       userProvider.setUser(data);
+      userProvider.setProfileImage(profile?.filePath); // 👈 HERE
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const AdminDashBoardPage()),
@@ -149,6 +154,8 @@ class LoginController {
       });
 
       userProvider.setUser(data);
+      userProvider.setProfileImage(profile?.filePath); // 👈 HERE
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const DashBoardPage()),
@@ -167,6 +174,8 @@ class LoginController {
       });
 
       userProvider.setUser(data);
+      userProvider.setProfileImage(profile?.filePath); // 👈 HERE
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const FacultyDashBoardPage()),

@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../user_provider.dart';
 import '../../widget/cancel_dialog.dart';
 
@@ -28,11 +30,12 @@ class EditProfileModal {
     final specCtrl = TextEditingController(text: user.specialization ?? "");
 
     bool isLoading = false;
+    XFile? newProfileImage;
 
     // -------------------- Modal --------------------
     return showModalBottomSheet(
       isScrollControlled: true,
-      backgroundColor: Colors.white, // ✅ White background
+      backgroundColor: Colors.white,
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
@@ -60,13 +63,8 @@ class EditProfileModal {
 
           bool isValidEmail(String email) {
             final allowedDomains = [
-              'gmail.com',
-              'yahoo.com',
-              'outlook.com',
-              'hotmail.com',
-              'icloud.com',
-              'live.com',
-              'aol.com',
+              'gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com',
+              'icloud.com', 'live.com', 'aol.com',
             ];
             if (!email.contains('@')) return false;
             final parts = email.split('@');
@@ -74,32 +72,49 @@ class EditProfileModal {
             return allowedDomains.contains(parts[1].toLowerCase());
           }
 
-          // Custom formatter: allow digits and a single dash
+          // Student number formatter
           final studentNumberFormatter = FilteringTextInputFormatter.allow(
             RegExp(r'^\d*-?\d*$'),
           );
 
+          Future<void> pickProfileImage() async {
+            final picker = ImagePicker();
+            final picked = await picker.pickImage(source: ImageSource.gallery);
+            if (picked != null) setState(() => newProfileImage = picked);
+          }
+
           return Padding(
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              left: 20,
-              right: 20,
-              top: 25,
+              left: 20, right: 20, top: 25,
             ),
             child: SingleChildScrollView(
               child: Column(
                 children: [
+                  // -------------------- Profile picture --------------------
+                  GestureDetector(
+                    onTap: pickProfileImage,
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: const Color(0xFFE3F2FD),
+                      backgroundImage: newProfileImage != null
+                          ? FileImage(File(newProfileImage!.path))
+                          : (user.profileImagePath.isNotEmpty
+                          ? NetworkImage(user.profileImagePath)
+                          : const AssetImage('assets/profile_pic.png')) as ImageProvider,
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+
                   _styledInput("First Name", firstNameCtrl, lettersOnly: true),
                   _styledInput("Middle Initial", middleInitialCtrl, lettersOnly: true, maxLength: 1),
                   _styledInput("Last Name", lastNameCtrl, lettersOnly: true),
 
-                  // Student fields
                   if (type == ProfileType.student) ...[
                     _styledInput("Student Number", studentNumberCtrl, inputFormatter: studentNumberFormatter),
                     _styledDropdown("Year Level", yearLevelCtrl, yearOptions),
                   ],
 
-                  // Faculty fields
                   if (type == ProfileType.faculty) ...[
                     _styledInput("Contact No", contactCtrl, digitsOnly: true, maxLength: 11),
                     _styledInput("Department", deptCtrl),
@@ -116,9 +131,7 @@ class EditProfileModal {
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Color(0xFF33A1E0), width: 1.5),
                             foregroundColor: const Color(0xFF33A1E0),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                           onPressed: () {
@@ -136,18 +149,12 @@ class EditProfileModal {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF33A1E0),
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          onPressed: isLoading
-                              ? null
-                              : () async {
-                            if (firstNameCtrl.text.isEmpty ||
-                                lastNameCtrl.text.isEmpty ||
-                                emailCtrl.text.isEmpty ||
-                                (type == ProfileType.faculty && contactCtrl.text.isEmpty)) {
+                          onPressed: isLoading ? null : () async {
+                            if (firstNameCtrl.text.isEmpty || lastNameCtrl.text.isEmpty || emailCtrl.text.isEmpty
+                                || (type == ProfileType.faculty && contactCtrl.text.isEmpty)) {
                               showAlert("Missing Fields", "Please fill in all required fields.");
                               return;
                             }
@@ -165,31 +172,25 @@ class EditProfileModal {
 
                             setState(() => isLoading = true);
 
+                            final oldImage = user.profileImagePath;
+
+                            // -------------------- Save profile info --------------------
                             await _saveProfile(
-                              context,
-                              user,
-                              type,
-                              firstNameCtrl,
-                              middleInitialCtrl,
-                              lastNameCtrl,
-                              emailCtrl,
-                              studentNumberCtrl,
-                              yearLevelCtrl,
-                              contactCtrl,
-                              deptCtrl,
-                              specCtrl,
+                              context, user, type,
+                              firstNameCtrl, middleInitialCtrl, lastNameCtrl, emailCtrl,
+                              studentNumberCtrl, yearLevelCtrl, contactCtrl, deptCtrl, specCtrl,
+                              newProfileImage,
                             );
+
+                            // Restore old image if no new image selected
+                            if (newProfileImage == null) user.updateProfileImage(oldImage);
 
                             if (context.mounted) setState(() => isLoading = false);
                           },
                           child: isLoading
                               ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2.5,
-                            ),
+                            height: 24, width: 24,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                           )
                               : const Text("Save", style: TextStyle(fontWeight: FontWeight.w600)),
                         ),
@@ -206,7 +207,7 @@ class EditProfileModal {
     );
   }
 
-  // -------------------- Styled Input --------------------
+  // ---------- Styled Input & Dropdown ----------
   static Widget _styledInput(String label, TextEditingController ctrl,
       {bool lettersOnly = false, bool digitsOnly = false, int? maxLength, TextInputFormatter? inputFormatter}) {
     List<TextInputFormatter> formatters = [];
@@ -222,34 +223,23 @@ class EditProfileModal {
         inputFormatters: formatters,
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(
-            color: Color(0xFF33A1E0),
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
+          labelStyle: const TextStyle(color: Color(0xFF33A1E0), fontSize: 14, fontWeight: FontWeight.w500),
           filled: true,
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(
-              color: Color(0xFF90CAF9),
-              width: 1,
-            ),
+            borderSide: const BorderSide(color: Color(0xFF90CAF9), width: 1),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(
-              color: Color(0xFF33A1E0),
-              width: 1.5,
-            ),
+            borderSide: const BorderSide(color: Color(0xFF33A1E0), width: 1.5),
           ),
         ),
       ),
     );
   }
 
-  // -------------------- Styled Dropdown --------------------
   static Widget _styledDropdown(String label, TextEditingController ctrl, List<String> options) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -257,11 +247,7 @@ class EditProfileModal {
         value: ctrl.text.isNotEmpty ? ctrl.text : null,
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(
-            color: Color(0xFF33A1E0),
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
+          labelStyle: const TextStyle(color: Color(0xFF33A1E0), fontSize: 14, fontWeight: FontWeight.w500),
           filled: true,
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -280,7 +266,6 @@ class EditProfileModal {
     );
   }
 
-  // -------------------- Helpers --------------------
   static ProfileType _detectProfileType(UserProvider user) {
     if (user.adminId != null) return ProfileType.admin;
     if (user.facultyId != null) return ProfileType.faculty;
@@ -288,7 +273,6 @@ class EditProfileModal {
     return ProfileType.admin;
   }
 
-  // -------------------- Save --------------------
   static Future<void> _saveProfile(
       BuildContext context,
       UserProvider user,
@@ -302,6 +286,7 @@ class EditProfileModal {
       TextEditingController contactNoCtrl,
       TextEditingController deptCtrl,
       TextEditingController specCtrl,
+      XFile? newProfileImage,
       ) async {
     try {
       switch (type) {
@@ -320,7 +305,6 @@ class EditProfileModal {
             );
           }
           break;
-
         case ProfileType.faculty:
           if (user.facultyId != null) {
             await user.updateFacultyProfile(
@@ -336,19 +320,15 @@ class EditProfileModal {
             );
           }
           break;
-
         case ProfileType.admin:
           user.updateProfile(email: emailCtrl.text.trim());
           break;
       }
 
-      if (user.userId != null) {
-        await user.fetchUserById(user.userId!);
-      }
+      if (user.userId != null) await user.fetchUserById(user.userId!);
 
       if (context.mounted) Navigator.pop(context);
     } catch (e) {
-      debugPrint("Error in _saveProfile: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Failed to update profile: $e")),
       );

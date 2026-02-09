@@ -1,5 +1,6 @@
 import 'package:e_learning_app/db_connect.dart';
 import 'package:flutter/material.dart';
+import '../services/pages/profile_service.dart';
 
 class UserProvider with ChangeNotifier {
   int? userId;
@@ -9,6 +10,9 @@ class UserProvider with ChangeNotifier {
   String? email;
   String? contactNo;
   String? dateCreated;
+
+  // Profile Pic Path
+  String profileImagePath = 'assets/profile_pic.png';
 
   // Admin only
   int? adminId;
@@ -24,6 +28,8 @@ class UserProvider with ChangeNotifier {
   String? yearLevel;
 
   String? role;
+
+  final ProfileService _profileService = ProfileService();
 
   String get fullName {
     final mi = (middleInitial != null && middleInitial!.isNotEmpty)
@@ -43,7 +49,6 @@ class UserProvider with ChangeNotifier {
     contactNo = data['contact_no'];
     dateCreated = data['date_created']?.toString();
 
-    // Determine role if not provided
     role = data['role'] ??
         (data['admin_id'] != null
             ? 'Admin'
@@ -61,7 +66,6 @@ class UserProvider with ChangeNotifier {
       facultyId = data['faculty_id'];
       department = data['department'];
       specialization = data['specialization'];
-      dateCreated = data['date_created']?.toString();
     } else {
       facultyId = null;
       department = null;
@@ -79,6 +83,14 @@ class UserProvider with ChangeNotifier {
       yearLevel = null;
     }
 
+    // Profile Image: Keep current if none from backend
+    profileImagePath = data['file_path'] ?? profileImagePath ?? 'assets/profile_pic.png';
+
+    notifyListeners();
+  }
+
+  void setProfileImage(String? path) {
+    profileImagePath = path ?? profileImagePath;
     notifyListeners();
   }
 
@@ -101,10 +113,12 @@ class UserProvider with ChangeNotifier {
     yearLevel = null;
 
     role = null;
+    profileImagePath = 'assets/profile_pic.png';
 
     notifyListeners();
   }
 
+  /// Fetch user by ID
   Future<void> fetchUserById(int userId) async {
     try {
       final response = await supabase
@@ -135,12 +149,7 @@ class UserProvider with ChangeNotifier {
           .eq('user_id', userId)
           .maybeSingle();
 
-      debugPrint("🔹 fetchUserById response: $response");
-
-      if (response == null) {
-        debugPrint("No user found for ID $userId");
-        return;
-      }
+      if (response == null) return;
 
       final userMap = Map<String, dynamic>.from(response);
 
@@ -186,7 +195,6 @@ class UserProvider with ChangeNotifier {
         'faculty_id': f['faculty_id'],
         'department': f['department'] ?? '',
         'specialization': f['specialization'] ?? '',
-        'date_created': data['date_created'],
       });
 
       // ADMIN
@@ -200,13 +208,14 @@ class UserProvider with ChangeNotifier {
         } else {
           a = {};
         }
-        data.addAll({
-          'admin_id': a['admin_id'],
-          'admin_date_created': a['date_created'],
-        });
+        data.addAll({'admin_id': a['admin_id']});
       }
 
-      //Infer role based on available tables
+      // PROFILE IMAGE: Keep old if null
+      final profileFile = await _profileService.fetchProfileFile(userId: userId);
+      data['file_path'] = profileFile?.filePath ?? profileImagePath ?? 'assets/profile_pic.png';
+
+      // Infer role
       data['role'] = data['admin_id'] != null
           ? 'Admin'
           : data['faculty_id'] != null
@@ -216,12 +225,18 @@ class UserProvider with ChangeNotifier {
           : null;
 
       setUser(data);
-      debugPrint("After setUser - fullName: $fullName, email: $email, studentNumber: $studentNumber");
     } catch (e) {
       debugPrint("Error fetching user by ID: $e");
     }
   }
 
+  /// Update profile image locally (no upload needed)
+  void updateProfileImage(String? path) {
+    if (path != null) profileImagePath = path;
+    notifyListeners();
+  }
+
+  // STUDENT & FACULTY UPDATE METHODS
   Future<void> updateStudentProfile({
     required BuildContext context,
     required int studentId,
@@ -234,7 +249,6 @@ class UserProvider with ChangeNotifier {
     required String yearLevel,
   }) async {
     try {
-      debugPrint("Updating student profile in DB - studentId: $studentId, userId: $userId");
       await supabase.from('tbl_user').update({
         'firstName': firstName,
         'middleInitial': middleInitial,
@@ -247,16 +261,15 @@ class UserProvider with ChangeNotifier {
         'year_level': yearLevel,
       }).eq('student_id', studentId);
 
-      debugPrint("DB update done. Refetching user...");
+      // Fetch user without overwriting profileImagePath
+      final oldImage = profileImagePath;
       await fetchUserById(userId);
-
-      debugPrint("After fetchUserById - user.firstName: $firstName, user.studentNumber: $studentNumber");
+      profileImagePath = oldImage;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Student profile updated successfully')),
       );
     } catch (e) {
-      debugPrint("Error updating student profile: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error updating profile: $e')),
       );
@@ -274,31 +287,22 @@ class UserProvider with ChangeNotifier {
     required String department,
     required String specialization,
   }) async {
-    final int? uid = userId;
-
-    if (facultyId == null || uid == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Faculty or User ID not loaded")),
-      );
-      return;
-    }
+    if (facultyId == null || userId == null) return;
 
     try {
-      // Update DB
       await supabase.from('tbl_user').update({
         'firstName': firstName,
         'middleInitial': middleInitial,
         'lastName': lastName,
         'email': email,
         'contact_no': contactNo,
-      }).eq('user_id', uid);
+      }).eq('user_id', userId!);
 
       await supabase.from('tbl_faculty').update({
         'department': department,
         'specialization': specialization,
       }).eq('faculty_id', facultyId);
 
-      // Update local state
       this.firstName = firstName;
       this.middleInitial = middleInitial;
       this.lastName = lastName;
@@ -308,12 +312,10 @@ class UserProvider with ChangeNotifier {
       this.specialization = specialization;
 
       notifyListeners();
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Faculty profile updated successfully')),
       );
     } catch (e) {
-      debugPrint('Error updating faculty profile: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error updating profile: $e')),
       );

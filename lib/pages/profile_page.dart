@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../services/pages/profile_service.dart';
 import '../services/student/edit_profile_modal.dart';
 import '../user_provider.dart';
 import '../widget/logout_dialog.dart';
@@ -14,6 +16,29 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  final ProfileService _profileService = ProfileService();
+  bool _isFetchingProfile = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final user = context.read<UserProvider>();
+
+    if (!_isFetchingProfile && user.userId != null) {
+      _fetchProfileImage(user.userId!);
+    }
+  }
+
+  Future<void> _fetchProfileImage(int userId) async {
+    _isFetchingProfile = true;
+    final profile = await _profileService.fetchProfileFile(userId: userId);
+    if (!mounted) return;
+
+    if (profile?.filePath != null) {
+      context.read<UserProvider>().setProfileImage(profile!.filePath);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<UserProvider>(
@@ -52,7 +77,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-// -------------------- Profile Header --------------------
   Widget _buildProfileHeader(UserProvider user) {
     return Container(
       width: double.infinity,
@@ -60,11 +84,11 @@ class _ProfilePageState extends State<ProfilePage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
             color: Colors.black12,
             blurRadius: 6,
-            offset: const Offset(0, 3),
+            offset: Offset(0, 3),
           ),
         ],
       ),
@@ -90,10 +114,14 @@ class _ProfilePageState extends State<ProfilePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 10),
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 50,
-                  backgroundImage: AssetImage('assets/profile_placeholder.png'),
-                  backgroundColor: Color(0xFFE3F2FD),
+                  backgroundColor: const Color(0xFFE3F2FD),
+                  backgroundImage: user.profileImagePath.isNotEmpty
+                      ? (user.profileImagePath.startsWith('http')
+                      ? NetworkImage(user.profileImagePath)
+                      : AssetImage(user.profileImagePath) as ImageProvider)
+                      : const AssetImage('assets/profile_pic.png'),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -122,7 +150,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-// -------------------- Profile Details Section --------------------
   Widget _buildProfileDetailsSection(BuildContext context, UserProvider user) {
     return Container(
       width: double.infinity,
@@ -130,11 +157,11 @@ class _ProfilePageState extends State<ProfilePage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
             color: Colors.black12,
             blurRadius: 5,
-            offset: const Offset(0, 3),
+            offset: Offset(0, 3),
           ),
         ],
       ),
@@ -165,15 +192,19 @@ class _ProfilePageState extends State<ProfilePage> {
               ElevatedButton.icon(
                 onPressed: () async {
                   await EditProfileModal.show(context, user);
-                  setState(() {});
+                  // No need to reset _profileImageUrl
                 },
                 icon: const Icon(Icons.edit, color: Colors.white),
-                label: const Text("Edit Profile",
-                    style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
+                label: const Text(
+                  "Edit Profile",
+                  style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF33A1E0),
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
               OutlinedButton.icon(
@@ -181,20 +212,21 @@ class _ProfilePageState extends State<ProfilePage> {
                   LogoutDialog.show(
                     context: context,
                     onLogout: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LogInForm()),
-                      );
+                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LogInForm()));
                     },
                   );
                 },
                 icon: const Icon(Icons.logout, color: Color(0xFF33A1E0)),
-                label: const Text("Logout",
-                    style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF33A1E0))),
+                label: const Text(
+                  "Logout",
+                  style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF33A1E0)),
+                ),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF33A1E0), width: 2),
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ],
@@ -221,14 +253,15 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.label,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black54)),
+                Text(
+                  item.label,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black54),
+                ),
                 const SizedBox(height: 4),
-                Text(item.value,
-                    style: const TextStyle(fontSize: 16, color: Colors.black87)),
+                Text(
+                  item.value,
+                  style: const TextStyle(fontSize: 16, color: Colors.black87),
+                ),
               ],
             ),
           ),
@@ -238,7 +271,6 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
-// Profile info model
 class ProfileInfoItem {
   final IconData icon;
   final String label;
