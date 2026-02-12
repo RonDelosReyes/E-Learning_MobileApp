@@ -9,7 +9,6 @@ import '../user_provider.dart';
 import '../widget/logout_dialog.dart';
 import '../widget/student/hamburg_menu_stud.dart';
 import '../login_pages/login_form.dart';
-import '../widget/profile_edit_avatar.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
