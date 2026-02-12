@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../services/pages/profile_edit_service.dart';
 import '../services/pages/profile_service.dart';
+import '../services/pages/profile_storage_service.dart';
 import '../services/student/edit_profile_modal.dart';
 import '../user_provider.dart';
 import '../widget/logout_dialog.dart';
 import '../widget/student/hamburg_menu_stud.dart';
 import '../login_pages/login_form.dart';
+import '../widget/profile_edit_avatar.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -31,11 +34,26 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _fetchProfileImage(int userId) async {
     _isFetchingProfile = true;
+
+    // Fetch the stored file path (filename) from DB
     final profile = await _profileService.fetchProfileFile(userId: userId);
     if (!mounted) return;
 
     if (profile?.filePath != null) {
-      context.read<UserProvider>().setProfileImage(profile!.filePath);
+      // Generate a signed URL before updating the Provider
+      final signedUrl = await ProfileStorageService().getSignedUrl(
+        profile!.filePath,
+        expiresInSeconds: 300, // e.g., 5 minutes
+      );
+
+      if (signedUrl != null) {
+        context.read<UserProvider>().setProfileImage(signedUrl);
+      } else {
+        debugPrint("Failed to generate signed URL for profile image");
+        context.read<UserProvider>().setProfileImage(''); // fallback
+      }
+    } else {
+      context.read<UserProvider>().setProfileImage('');
     }
   }
 
@@ -92,63 +110,40 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            top: 0,
-            right: 0,
-            child: GestureDetector(
-              onTap: () async {
-                await EditProfileModal.show(context, user);
-              },
-              child: const CircleAvatar(
-                radius: 18,
-                backgroundColor: Color(0xFF33A1E0),
-                child: Icon(Icons.edit, color: Colors.white, size: 20),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            ProfileAvatarUploader(
+              userId: user.userId!,
+              radius: 50,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              user.fullName,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+                fontFamily: 'Poppins',
               ),
             ),
-          ),
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 10),
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: const Color(0xFFE3F2FD),
-                  backgroundImage: user.profileImagePath.isNotEmpty
-                      ? (user.profileImagePath.startsWith('http')
-                      ? NetworkImage(user.profileImagePath)
-                      : AssetImage(user.profileImagePath) as ImageProvider)
-                      : const AssetImage('assets/profile_pic.png'),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  user.fullName,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                    fontFamily: 'Poppins',
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  "Student",
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.black54,
-                    fontFamily: 'Poppins',
-                  ),
-                ),
-              ],
+            const SizedBox(height: 6),
+            const Text(
+              "Student",
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.black54,
+                fontFamily: 'Poppins',
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+
 
   Widget _buildProfileDetailsSection(BuildContext context, UserProvider user) {
     return Container(
