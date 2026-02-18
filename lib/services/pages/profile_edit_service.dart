@@ -28,7 +28,7 @@ class _ProfileAvatarUploaderState extends State<ProfileAvatarUploader> {
 
   /// Pick image from gallery and upload
   Future<void> _pickAndUploadImage() async {
-    if (_isPickingImage) return;
+    if (_isPickingImage || _isUploading) return;
     _isPickingImage = true;
 
     final picker = ImagePicker();
@@ -50,6 +50,7 @@ class _ProfileAvatarUploaderState extends State<ProfileAvatarUploader> {
       final newFileName = await _storageService.uploadProfileImage(
         userId: widget.userId,
         file: file,
+        oldFilePath: oldFileName, // automatically deletes old image
       );
 
       if (newFileName != null) {
@@ -59,28 +60,11 @@ class _ProfileAvatarUploaderState extends State<ProfileAvatarUploader> {
           filePath: newFileName,
         );
 
-        // 4️⃣ Delete old file (after DB update)
-        if (oldFileName != null && oldFileName.isNotEmpty) {
-          try {
-            await _storageService.deleteProfileImage(oldFileName);
-            debugPrint('Deleted old profile image: $oldFileName');
-          } catch (e) {
-            debugPrint('Failed to delete old profile image: $e');
-          }
-        }
+        // 4️⃣ Get public URL for the new image
+        final publicUrl = _storageService.getPublicUrl(newFileName);
 
-        // 5️⃣ Generate signed URL for the new file
-        final signedUrl = await _storageService.getSignedUrl(
-          newFileName,
-          expiresInSeconds: 300,
-        );
-
-        if (signedUrl != null) {
-          // 6️⃣ Update Provider with signed URL
-          context.read<UserProvider>().setProfileImage(signedUrl);
-        } else {
-          debugPrint("Failed to generate signed URL");
-        }
+        // 5️⃣ Update Provider with new image
+        context.read<UserProvider>().setProfileImage(publicUrl);
       } else {
         debugPrint("Failed to upload profile image");
       }
@@ -94,20 +78,16 @@ class _ProfileAvatarUploaderState extends State<ProfileAvatarUploader> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final profileUrl = context.watch<UserProvider>().profileImagePath;
 
-    ImageProvider imageProvider;
-
-    // Use network image if it's a valid URL, fallback to default asset
+    final ImageProvider imageProvider;
     if (profileUrl.isEmpty) {
       imageProvider = const AssetImage('assets/profile_pic.png');
     } else if (profileUrl.startsWith('http')) {
       imageProvider = NetworkImage(profileUrl);
     } else {
-      // In case a relative path sneaks in, fallback
       imageProvider = const AssetImage('assets/profile_pic.png');
     }
 

@@ -1,37 +1,58 @@
-import 'package:e_learning_app/pages/profile_page.dart';
 import 'package:flutter/material.dart';
-import 'package:e_learning_app/pages/courses_page.dart';
-import 'package:e_learning_app/pages/dashboard_page.dart';
-import 'package:e_learning_app/pages/knowledge_lab_page.dart';
-import 'package:e_learning_app/pages/techlib_page.dart';
-import 'package:e_learning_app/login_pages/login_form.dart';
-import 'package:e_learning_app/widget/alert_dialog.dart';
-import 'package:e_learning_app/widget/logout_dialog.dart';
+import 'package:provider/provider.dart';
+import '../../services/student/hamburgMenu_backend.dart';
+import '../../user_provider.dart';
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({super.key});
+  final String currentRoute;
+
+  const AppDrawer({super.key, required this.currentRoute});
 
   @override
   Widget build(BuildContext context) {
-    final menuItems = _menuItems(context);
+    final backend = AppDrawerBackend(context, currentRoute);
 
     return Drawer(
-      backgroundColor: const Color(0xFF33A1E0),
+      backgroundColor: Colors.white,
       child: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildCloseButton(context),
-            const SizedBox(height: 40),
+            const SizedBox(height: 16),
+
+            // Close button
+            Align(
+              alignment: Alignment.topRight,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: AppDrawerBackend.iconDefault),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            // Reactive Profile Header
+            Consumer<UserProvider>(
+              builder: (context, user, child) {
+                return GestureDetector(
+                  onTap: backend.openProfileOverlay,
+                  child: backend.buildProfileHeader(user),
+                );
+              },
+            ),
+
+            const SizedBox(height: 30),
+
+            // Menu items
             Expanded(
-              child: SingleChildScrollView(
+              child: ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: menuItems
-                      .map((item) => _drawerButton(item))
-                      .toList(),
-                ),
+                itemCount: backend.menuItems.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final item = backend.menuItems[index];
+                  final isSelected = currentRoute == item.route;
+                  return backend.buildDrawerItem(item, isSelected);
+                },
               ),
             ),
           ],
@@ -39,110 +60,4 @@ class AppDrawer extends StatelessWidget {
       ),
     );
   }
-
-  // -------------------- Close Button --------------------
-  Widget _buildCloseButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 10, top: 20),
-      child: IconButton(
-        icon: const Icon(Icons.close, color: Colors.white, size: 40),
-        onPressed: () => Navigator.pop(context),
-      ),
-    );
-  }
-
-  // -------------------- Drawer Button --------------------
-  Widget _drawerButton(DrawerMenuItem item) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: GestureDetector(
-        onTap: item.onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            item.title,
-            style: TextStyle(
-              color: item.isLogout ? Colors.red : Colors.black,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // -------------------- Menu Configuration --------------------
-  List<DrawerMenuItem> _menuItems(BuildContext context) {
-    return [
-      DrawerMenuItem(
-        title: 'Home',
-        onTap: () => _navigate(context, const DashBoardPage()),
-      ),
-      DrawerMenuItem(
-        title: 'Courses',
-        onTap: () => _navigate(context, const CoursesPage()),
-      ),
-      DrawerMenuItem(
-        title: 'Tech Library',
-        onTap: () => _navigate(context, const TechLibraryPage()),
-      ),
-      DrawerMenuItem(
-        title: 'Knowledge Lab',
-        onTap: () => _navigate(context, const KnowledgeLabPage()),
-      ),
-      DrawerMenuItem(
-        title: 'AR Lab',
-        onTap: () => CustomAlertDialog().show(context),
-      ),
-      DrawerMenuItem(
-        title: 'Community Hub',
-        onTap: () => CustomAlertDialog().show(context),
-      ),
-      DrawerMenuItem(
-        title: 'My Profile',
-        onTap: () => _navigate(context, const ProfilePage()),
-      ),
-      DrawerMenuItem(
-        title: 'Log Out',
-        isLogout: true,
-        onTap: () {
-          LogoutDialog.show(
-            context: context,
-            onLogout: () {
-              Navigator.of(context, rootNavigator: true).pushReplacement(
-                MaterialPageRoute(builder: (_) => const LogInForm()),
-              );
-            },
-          );
-        },
-      ),
-    ];
-  }
-
-  // -------------------- Navigation Helper --------------------
-  void _navigate(BuildContext context, Widget page) {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => page),
-    );
-  }
-}
-
-// -------------------- Drawer Menu Model --------------------
-class DrawerMenuItem {
-  final String title;
-  final VoidCallback onTap;
-  final bool isLogout;
-
-  const DrawerMenuItem({
-    required this.title,
-    required this.onTap,
-    this.isLogout = false,
-  });
 }

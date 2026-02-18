@@ -1,4 +1,5 @@
 import 'package:e_learning_app/db_connect.dart';
+import 'package:e_learning_app/services/pages/profile_storage_service.dart';
 import 'package:flutter/material.dart';
 import '../services/pages/profile_service.dart';
 
@@ -49,7 +50,8 @@ class UserProvider with ChangeNotifier {
     contactNo = data['contact_no'];
     dateCreated = data['date_created']?.toString();
 
-    role = data['role'] ??
+    role =
+        data['role'] ??
         (data['admin_id'] != null
             ? 'Admin'
             : data['faculty_id'] != null
@@ -84,7 +86,8 @@ class UserProvider with ChangeNotifier {
     }
 
     // Profile Image: Keep current if none from backend
-    profileImagePath = data['file_path'] ?? profileImagePath ?? 'assets/profile_pic.png';
+    profileImagePath =
+        data['file_path'] ?? profileImagePath ?? 'assets/profile_pic.png';
 
     notifyListeners();
   }
@@ -212,8 +215,20 @@ class UserProvider with ChangeNotifier {
       }
 
       // PROFILE IMAGE: Keep old if null
-      final profileFile = await _profileService.fetchProfileFile(userId: userId);
-      data['file_path'] = profileFile?.filePath ?? profileImagePath ?? 'assets/profile_pic.png';
+      final profileFile = await _profileService.fetchProfileFile(
+        userId: userId,
+      );
+      String profileUrl;
+
+      // Use public URL instead of signed URL
+      if (profileFile != null && profileFile.filePath.isNotEmpty) {
+        final profileStorage = ProfileStorageService();
+        profileUrl = profileStorage.getPublicUrl(profileFile.filePath);
+      } else {
+        profileUrl = 'assets/profile_pic.png'; // fallback
+      }
+
+      data['file_path'] = profileUrl;
 
       // Infer role
       data['role'] = data['admin_id'] != null
@@ -249,17 +264,20 @@ class UserProvider with ChangeNotifier {
     required String yearLevel,
   }) async {
     try {
-      await supabase.from('tbl_user').update({
-        'firstName': firstName,
-        'middleInitial': middleInitial,
-        'lastName': lastName,
-        'email': email,
-      }).eq('user_id', userId);
+      await supabase
+          .from('tbl_user')
+          .update({
+            'firstName': firstName,
+            'middleInitial': middleInitial,
+            'lastName': lastName,
+            'email': email,
+          })
+          .eq('user_id', userId);
 
-      await supabase.from('tbl_student').update({
-        'student_num': studentNumber,
-        'year_level': yearLevel,
-      }).eq('student_id', studentId);
+      await supabase
+          .from('tbl_student')
+          .update({'student_num': studentNumber, 'year_level': yearLevel})
+          .eq('student_id', studentId);
 
       // Fetch user without overwriting profileImagePath
       final oldImage = profileImagePath;
@@ -270,9 +288,9 @@ class UserProvider with ChangeNotifier {
         const SnackBar(content: Text('Student profile updated successfully')),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating profile: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error updating profile: $e')));
     }
   }
 
@@ -290,18 +308,21 @@ class UserProvider with ChangeNotifier {
     if (facultyId == null || userId == null) return;
 
     try {
-      await supabase.from('tbl_user').update({
-        'firstName': firstName,
-        'middleInitial': middleInitial,
-        'lastName': lastName,
-        'email': email,
-        'contact_no': contactNo,
-      }).eq('user_id', userId!);
+      await supabase
+          .from('tbl_user')
+          .update({
+            'firstName': firstName,
+            'middleInitial': middleInitial,
+            'lastName': lastName,
+            'email': email,
+            'contact_no': contactNo,
+          })
+          .eq('user_id', userId!);
 
-      await supabase.from('tbl_faculty').update({
-        'department': department,
-        'specialization': specialization,
-      }).eq('faculty_id', facultyId);
+      await supabase
+          .from('tbl_faculty')
+          .update({'department': department, 'specialization': specialization})
+          .eq('faculty_id', facultyId);
 
       this.firstName = firstName;
       this.middleInitial = middleInitial;
@@ -316,9 +337,9 @@ class UserProvider with ChangeNotifier {
         const SnackBar(content: Text('Faculty profile updated successfully')),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating profile: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error updating profile: $e')));
     }
   }
 

@@ -106,7 +106,7 @@ class _FacultyUserManagerPageState extends State<FacultyUserManagerPage> {
             ),
           ],
         ),
-        drawer: FacultyAppDrawer(),
+        drawer: const FacultyAppDrawer(currentRoute: 'user_manager'),
         body: _isStatusLoading
             ? const Center(child: CircularProgressIndicator())
             : FutureBuilder<List<Map<String, dynamic>>>(

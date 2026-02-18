@@ -28,7 +28,7 @@ class _ARLabPageState extends State<ARLabPage> {
           ),
           backgroundColor: const Color(0xFF33A1E0),
         ),
-        drawer: const AppDrawer(),
+        drawer: const AppDrawer(currentRoute: 'arlab'),
         body: _buildBody(),
       ),
     );

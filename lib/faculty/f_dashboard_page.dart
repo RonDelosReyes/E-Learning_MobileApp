@@ -11,29 +11,26 @@ class FacultyDashBoardPage extends StatelessWidget {
   void _showExitDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            title: const Text('Exit App'),
-            content: const Text('Are you sure you want to exit?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('No'),
-              ),
-              TextButton(
-                onPressed: () => SystemNavigator.pop(),
-                child: const Text('Yes'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('Exit App'),
+        content: const Text('Are you sure you want to exit?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('No'),
           ),
+          TextButton(
+            onPressed: () => SystemNavigator.pop(),
+            child: const Text('Yes'),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final firstName = Provider
-        .of<UserProvider>(context)
-        .firstName;
+    final firstName = Provider.of<UserProvider>(context).firstName;
 
     // Exit dialog Action
     return PopScope(
@@ -62,7 +59,7 @@ class FacultyDashBoardPage extends StatelessWidget {
         ),
 
         // Drawer Section
-        drawer: FacultyAppDrawer(),
+        drawer: const FacultyAppDrawer(currentRoute: 'home'),
 
         body: Center(
           child: Text(

@@ -3,45 +3,99 @@ import 'package:flutter/material.dart';
 class CancelDialog {
   static Future<void> show({
     required BuildContext context,
-    required VoidCallback onConfirm, // changed to match call
+    required VoidCallback onConfirm,
   }) async {
-    showDialog(
+    await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        backgroundColor: const Color(0xFFF5F9FF),
-        title: const Text(
-          "Cancel Registration",
-          style: TextStyle(
-            color: Color(0xFF33A1E0),
-            fontWeight: FontWeight.bold,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-        ),
-        content: const Text(
-          "Are you sure you want to cancel? Unsaved data will be lost.",
-          style: TextStyle(color: Colors.black87),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              "No",
-              style: TextStyle(color: Color(0xFF33A1E0)),
+          elevation: 8,
+          backgroundColor: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 28,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title
+                const Text(
+                  "Cancel Registration",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1565C0),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Message
+                const Text(
+                  "Are you sure you want to cancel? Unsaved data will be lost.",
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.black87,
+                    height: 1.4,
+                  ),
+                ),
+
+                const SizedBox(height: 28),
+
+                // Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () =>
+                          Navigator.of(dialogContext).pop(),
+                      child: const Text(
+                        "No",
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                        onConfirm();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1565C0),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "Yes, Cancel",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              onConfirm(); // call the correct callback
-            },
-            child: const Text(
-              "Yes",
-              style: TextStyle(color: Color(0xFF33A1E0)),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
