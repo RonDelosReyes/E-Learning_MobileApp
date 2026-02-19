@@ -1,3 +1,4 @@
+import 'package:e_learning_app/Desktop_App/login_pages/desktop_login_form.dart';
 import 'package:flutter/material.dart';
 import 'package:e_learning_app/login_pages/login_form.dart';
 import 'package:e_learning_app/widget/alert_dialog.dart';
@@ -108,7 +109,7 @@ class AdminAppDrawer extends StatelessWidget {
             context: context,
             onLogout: () {
               Navigator.of(context, rootNavigator: true).pushReplacement(
-                MaterialPageRoute(builder: (_) => const LogInForm()),
+                MaterialPageRoute(builder: (_) => const DesktopLoginForm()),
               );
             },
           );

@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../admin/a_dashboard_page.dart';
 import '../../db_connect.dart';
 import '../../faculty/f_dashboard_page.dart';
-import '../../login_pages/otp_modal.dart';
 import '../../pages/dashboard_page.dart';
+import '../../login_pages/otp_modal.dart';
 import '../../user_provider.dart';
 
 import '../auth_service.dart';
 import '../otp_service_email.dart';
 import '../pages/profile_service.dart';
 
-class LoginController {
-  bool _otpDialogOpen = false; // prevent duplicate OTP dialogs
+class UserLoginController {
+  bool _otpDialogOpen = false;
 
   Future<void> handleLogin({
     required BuildContext context,
@@ -29,8 +28,6 @@ class LoginController {
     if (loginData == null) return;
 
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-
-    // ---------- USER EXTRACTION ----------
     final user = loginData['tbl_user'] ?? loginData['user'] ?? loginData;
     if (user == null || (user is Map && user.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -68,9 +65,7 @@ class LoginController {
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Account verified. Please login again."),
-        ),
+        const SnackBar(content: Text("Account verified. Please login again.")),
       );
       return;
     }
@@ -78,9 +73,7 @@ class LoginController {
     if (statusNo == 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            "Your account is inactive. Please contact the administrator.",
-          ),
+          content: Text("Your account is inactive. Please contact the administrator."),
         ),
       );
       return;
@@ -94,14 +87,12 @@ class LoginController {
     }
 
     // ---------- ROLE DETECTION ----------
-    final bool isAdmin =
-        loginData['tbl_admin'] != null && loginData['tbl_admin'].isNotEmpty;
     final bool isFaculty =
         loginData['tbl_faculty'] != null && loginData['tbl_faculty'].isNotEmpty;
     final bool isStudent =
         loginData['tbl_student'] != null && loginData['tbl_student'].isNotEmpty;
 
-    if (!isAdmin && !isFaculty && !isStudent) {
+    if (!isFaculty && !isStudent) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("No role assigned to this account.")),
       );
@@ -119,29 +110,9 @@ class LoginController {
       "date_created": user['date_created'] ?? user['date_joined'],
     };
 
-    // ---------- FETCH PROFILE IMAGE (ONCE) ----------
+    // ---------- FETCH PROFILE IMAGE ----------
     final profileService = ProfileService();
-    final profile = await profileService.fetchProfileFile(
-      userId: user["user_id"],
-    );
-
-    // ---------- ADMIN ----------
-    if (isAdmin) {
-      final a = loginData['tbl_admin'][0];
-      data.addAll({
-        "role": "Admin",
-        "admin_id": a["admin_id"],
-      });
-
-      userProvider.setUser(data);
-      userProvider.setProfileImage(profile?.filePath); // 👈 HERE
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const AdminDashBoardPage()),
-      );
-      return;
-    }
+    final profile = await profileService.fetchProfileFile(userId: user["user_id"]);
 
     // ---------- STUDENT ----------
     if (isStudent) {
@@ -154,7 +125,7 @@ class LoginController {
       });
 
       userProvider.setUser(data);
-      userProvider.setProfileImage(profile?.filePath); // 👈 HERE
+      userProvider.setProfileImage(profile?.filePath);
 
       Navigator.pushReplacement(
         context,
@@ -174,7 +145,7 @@ class LoginController {
       });
 
       userProvider.setUser(data);
-      userProvider.setProfileImage(profile?.filePath); // 👈 HERE
+      userProvider.setProfileImage(profile?.filePath);
 
       Navigator.pushReplacement(
         context,

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:e_learning_app/Desktop_App/login_pages/desktop_login_form.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -28,7 +29,7 @@ class AppEntry extends StatelessWidget {
 
     if (isDesktop) {
       debugPrint('Running on DESKTOP');
-      return const AdminDashBoardPage(); // Desktop entry
+      return const DesktopLoginForm(); // Desktop entry
       // return const AdminDashBoardDesktopPage();
     }
 
