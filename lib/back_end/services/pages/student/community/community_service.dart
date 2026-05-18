@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../connection/db_connect.dart';
 import '../../../../../models/student/community_hub/community_model.dart';
@@ -10,8 +11,6 @@ class CommunityService {
   /// Supports filtering by multiple category IDs.
   Future<List<CommunityPost>> fetchCommunityPosts({List<int>? categoryIds, int? currentUserId}) async {
     try {
-      await DebugLogger.log('COMMUNITY_DEBUG: Starting fetch. categoryIds: $categoryIds, currentUserId: $currentUserId');
-      
       // 1. Initial query setup - fetching ALL community posts
       var query = _supabase.from('tbl_post').select('''
         post_id,
@@ -35,7 +34,6 @@ class CommunityService {
 
       // Add category filter if provided and not empty
       if (categoryIds != null && categoryIds.isNotEmpty) {
-        await DebugLogger.log('COMMUNITY_DEBUG: Filtering by categoryIds: $categoryIds');
         query = query.inFilter('category_id', categoryIds);
       }
 
@@ -44,17 +42,14 @@ class CommunityService {
           .order('is_pinned', ascending: false)
           .order('created_at', ascending: false);
 
-      await DebugLogger.log('COMMUNITY_DEBUG: Raw Response Length: ${response.length}');
-
       // 2. Map to model
       final posts = (response as List)
           .map((p) => CommunityPost.fromMap(p, currentUserId: currentUserId))
           .toList();
 
-      await DebugLogger.log('COMMUNITY_DEBUG: Successfully mapped ${posts.length} posts');
       return posts;
     } catch (e) {
-      await DebugLogger.log('COMMUNITY_DEBUG ERROR: $e');
+      debugPrint('COMMUNITY_SERVICE ERROR: $e');
       return [];
     }
   }
@@ -84,6 +79,20 @@ class CommunityService {
     } catch (e) {
       await DebugLogger.log('COMMUNITY_DEBUG CREATE POST ERROR: $e');
       throw Exception('Failed to create post: $e');
+    }
+  }
+
+  Future<void> updatePost(int postId, String title, String content) async {
+    try {
+      await _supabase.from('tbl_post').update({
+        'title': title,
+        'content': content,
+        'is_edited': true,
+      }).eq('post_id', postId);
+      await DebugLogger.log('COMMUNITY_DEBUG: Post $postId updated successfully');
+    } catch (e) {
+      await DebugLogger.log('COMMUNITY_DEBUG UPDATE POST ERROR: $e');
+      throw Exception('Failed to update post: $e');
     }
   }
 

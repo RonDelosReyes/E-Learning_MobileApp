@@ -16,6 +16,10 @@ class CommunityController {
     return await _service.createPost(userNo, title, content, categoryId, imageUrl);
   }
 
+  Future<void> updatePost(int postId, String title, String content) async {
+    return await _service.updatePost(postId, title, content);
+  }
+
   Future<void> deletePost(int postId) async {
     return await _service.deletePost(postId);
   }

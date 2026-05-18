@@ -1,109 +1,98 @@
 import 'package:e_learning_app/back_end/connection/db_connect.dart';
 import 'package:e_learning_app/back_end/utils/profile_pic_fetcher.dart';
+import 'package:e_learning_app/back_end/utils/name_helper.dart';
+import 'package:e_learning_app/back_end/utils/hardware_checker.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserProvider with ChangeNotifier {
   int? userId;
+  int? studentId;
+  String? studentNo;
   String? firstName;
-  String? middleInitial;
+  String? middleName;
   String? lastName;
   String? email;
-  String? contactNo;
+  int? programId;
+  String? programName;
+  int? statusNo;
   String? dateCreated;
+  bool isFirstTimer = true;
+  bool isArSupported = false; // Default to false for safety
 
   // Profile Pic Path (URL from bucket)
   String profileImagePath = 'assets/profile_pic.png';
 
-  // Faculty only
-  int? facultyId;
-  String? department;
-  String? specialization;
+  String get middleInitial => StandardNameHelper.getMiddleInitial(middleName);
 
-  // Student only
-  int? studentId;
-  String? studentNumber;
-  String? yearLevel;
-
-  String? role;
-
-  String get fullName {
-    final mi = (middleInitial != null && middleInitial!.isNotEmpty)
-        ? ' ${middleInitial!}.'
-        : '';
-    final fName = firstName ?? '';
-    final lName = lastName ?? '';
-    return '$fName$mi $lName'.trim();
-  }
+  String get fullName => StandardNameHelper.formatFullName(firstName, middleName, lastName);
 
   void setUser(Map<String, dynamic> data) {
+    debugPrint("DEBUG: [UserProvider] setUser triggered.");
+    
     userId = data['user_id'];
     firstName = data['firstName'];
-    middleInitial = data['middleInitial'];
+    middleName = data['middleName'];
     lastName = data['lastName'];
-    email = data['email'] ?? email; // Use existing if not provided
-    contactNo = data['contact_no'];
+    statusNo = data['status_no'];
     dateCreated = data['date_created']?.toString();
+    email = data['email'] ?? email;
 
-    // Check Faculty
-    final fData = data['tbl_faculty'];
-    final faculty = (fData != null && fData is List && fData.isNotEmpty) 
-        ? fData[0] 
-        : (fData is Map ? fData : null);
+    final studentData = data['tbl_student'];
+    final student = (studentData is List && studentData.isNotEmpty) 
+        ? studentData[0] 
+        : (studentData is Map ? studentData : null);
 
-    // Check Student
-    final sData = data['tbl_student'];
-    final student = (sData != null && sData is List && sData.isNotEmpty) 
-        ? sData[0] 
-        : (sData is Map ? sData : null);
-
-    if (faculty != null) {
-      role = 'Faculty';
-      facultyId = faculty['faculty_id'];
-      department = faculty['department'];
-      specialization = faculty['specialization'];
-      
-      studentId = null;
-      studentNumber = null;
-      yearLevel = null;
-    } else if (student != null) {
-      role = 'Student';
+    if (student != null) {
+      debugPrint("DEBUG: [UserProvider] Student record found: $student");
       studentId = student['student_id'];
-      studentNumber = student['student_num'];
-      yearLevel = student['year_level'];
+      studentNo = student['student_no'];
+      programId = student['program_id'];
+      isFirstTimer = student['is_first_timer'] ?? true;
       
-      facultyId = null;
-      department = null;
-      specialization = null;
-    } else {
-      role = data['role'] ?? role; // Fallback
-    }
+      final pData = student['tbl_program'];
+      final program = (pData is List && pData.isNotEmpty) 
+          ? pData[0] 
+          : (pData is Map ? pData : null);
 
-    // Handle Profile Image from initial data if available
-    if (data['file_path'] != null) {
-      profileImagePath = data['file_path'];
+      if (program != null) {
+        programName = program['program_name'];
+        debugPrint("DEBUG: [UserProvider] Successfully mapped programName: $programName");
+      } else {
+        programName = null;
+      }
     }
 
     notifyListeners();
 
-    // Automatically trigger a profile pic refresh using the fetcher logic
+    // Pass the userId to the fetcher (as required by tbl_profile)
     if (userId != null) {
       refreshProfileImage();
     }
+    
+    _checkArSupport();
   }
 
-  /// Update profile image and cache it in the provider
+  Future<void> _checkArSupport() async {
+    isArSupported = await HardwareChecker.checkArSupport();
+    notifyListeners();
+  }
+
   Future<void> refreshProfileImage() async {
-    if (userId == null) return;
+    if (userId == null) {
+      debugPrint("DEBUG: [UserProvider] refreshProfileImage called but userId is null.");
+      return;
+    }
     
+    debugPrint("DEBUG: [UserProvider] Refreshing profile image for userId: $userId");
     final url = await ProfilePicFetcher.fetch(userId!);
+    debugPrint("DEBUG: [UserProvider] ProfilePicFetcher returned URL: $url");
+
     if (url != null) {
       profileImagePath = url;
       notifyListeners();
     }
   }
 
-  /// Manually update profile image locally
   void updateProfileImage(String? path) {
     if (path != null) {
       profileImagePath = path;
@@ -113,166 +102,72 @@ class UserProvider with ChangeNotifier {
 
   void clearUser() {
     userId = null;
+    studentId = null;
+    studentNo = null;
     firstName = null;
-    middleInitial = null;
+    middleName = null;
     lastName = null;
     email = null;
-    contactNo = null;
+    programId = null;
+    programName = null;
+    statusNo = null;
     dateCreated = null;
-
-    facultyId = null;
-    specialization = null;
-    department = null;
-
-    studentId = null;
-    studentNumber = null;
-    yearLevel = null;
-
-    role = null;
+    isFirstTimer = true;
     profileImagePath = 'assets/profile_pic.png';
-
     notifyListeners();
   }
 
-  /// Fetch user details using auth_id (UUID from Supabase Auth)
   Future<void> fetchUserByAuthId(String authId) async {
     try {
       final response = await supabase
           .from('tbl_user')
           .select('''
             *,
-            tbl_student (*),
-            tbl_faculty (*),
-            tbl_profile (filePath)
+            tbl_student!tbl_student_user_id_fkey (
+              *,
+              tbl_program!tbl_student_program_id_fkey (program_name)
+            )
           ''')
           .eq('auth_id', authId)
           .maybeSingle();
 
       if (response != null) {
         final userData = Map<String, dynamic>.from(response);
-        // Ensure email is set from current auth user if missing in tbl_user
-        userData['email'] ??= supabase.auth.currentUser?.email;
+        userData['email'] = supabase.auth.currentUser?.email;
         setUser(userData);
       }
     } catch (e) {
-      debugPrint("Error fetching user by Auth ID: $e");
+      debugPrint("DEBUG: [UserProvider] fetchUserByAuthId ERROR: $e");
     }
   }
 
-  /// Fetch user by ID and align with tbl_profile and ProfilePictures bucket
-  Future<void> fetchUserById(int userId) async {
-    try {
-      final response = await supabase
-          .from('tbl_user')
-          .select('''
-            *,
-            tbl_student (*),
-            tbl_faculty (*),
-            tbl_profile (filePath)
-          ''')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-      if (response == null) return;
-
-      final userData = Map<String, dynamic>.from(response);
-      
-      // Email is usually in auth.users, get it from the current session if possible
-      userData['email'] = supabase.auth.currentUser?.email;
-
-      setUser(userData);
-    } catch (e) {
-      debugPrint("Error fetching user by ID: $e");
-    }
-  }
-
-  // UPDATES
   Future<void> updateStudentProfile({
     required BuildContext context,
-    required int studentId,
     required int userId,
     required String firstName,
-    required String middleInitial,
+    required String? middleName,
     required String lastName,
-    required String studentNumber,
-    required String yearLevel,
+    required String studentNo,
+    required int programId,
   }) async {
     try {
-      await supabase
-          .from('tbl_user')
-          .update({
-            'firstName': firstName,
-            'middleInitial': middleInitial,
-            'lastName': lastName,
-          })
-          .eq('user_id', userId);
+      await supabase.from('tbl_user').update({
+        'firstName': firstName,
+        'middleName': middleName,
+        'lastName': lastName,
+      }).eq('user_id', userId);
 
-      await supabase
-          .from('tbl_student')
-          .update({
-            'student_num': studentNumber, 
-            'year_level': yearLevel
-          })
-          .eq('student_id', studentId);
+      await supabase.from('tbl_student').update({
+        'student_no': studentNo,
+        'program_id': programId,
+      }).eq('user_no', userId);
 
-      await fetchUserById(userId);
+      await fetchUserByAuthId(supabase.auth.currentUser!.id);
 
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Student profile updated successfully')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated successfully')));
     } catch (e) {
       debugPrint("Error updating student profile: $e");
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update profile. Please try again later.')),
-      );
-    }
-  }
-
-  Future<void> updateFacultyProfile({
-    required BuildContext context,
-    required int? facultyId,
-    required String firstName,
-    required String middleInitial,
-    required String lastName,
-    required String contactNo,
-    required String department,
-    required String specialization,
-  }) async {
-    if (facultyId == null || userId == null) return;
-
-    try {
-      await supabase
-          .from('tbl_user')
-          .update({
-            'firstName': firstName,
-            'middleInitial': middleInitial,
-            'lastName': lastName,
-            'contact_no': contactNo,
-          })
-          .eq('user_id', userId!);
-
-      await supabase
-          .from('tbl_faculty')
-          .update({
-            'department': department, 
-            'specialization': specialization
-          })
-          .eq('faculty_id', facultyId);
-
-      await fetchUserById(userId!);
-
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Faculty profile updated successfully')),
-      );
-    } catch (e) {
-      debugPrint("Error updating faculty profile: $e");
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update profile. Please try again later.')),
-      );
     }
   }
 }

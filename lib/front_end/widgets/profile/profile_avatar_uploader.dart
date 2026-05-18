@@ -28,13 +28,17 @@ class _ProfileAvatarUploaderState extends State<ProfileAvatarUploader> {
 
   Future<void> _pickAndUploadImage() async {
     if (_isPickingImage || _isUploading) return;
-    _isPickingImage = true;
+    
+    setState(() => _isPickingImage = true);
 
     final picker = ImagePicker();
 
     try {
       final picked = await picker.pickImage(source: ImageSource.gallery);
-      if (picked == null) return;
+      if (picked == null) {
+        if (mounted) setState(() => _isPickingImage = false);
+        return;
+      }
 
       final file = File(picked.path);
 
@@ -47,7 +51,10 @@ class _ProfileAvatarUploaderState extends State<ProfileAvatarUploader> {
         pageBuilder: (context, _, __) {
           return ProfilePicEditor(
             imageFile: file,
-            onCancel: () => Navigator.pop(context),
+            onCancel: () {
+              Navigator.pop(context);
+              if (mounted) setState(() => _isPickingImage = false);
+            },
             onSave: (croppedFile) async {
               Navigator.pop(context); // Close editor
               await _processAndUpload(croppedFile);
@@ -58,25 +65,26 @@ class _ProfileAvatarUploaderState extends State<ProfileAvatarUploader> {
     } catch (e) {
       debugPrint("Picker Error: $e");
       _showSimpleError("Failed to select image.");
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isPickingImage = false;
-        });
-      }
+      if (mounted) setState(() => _isPickingImage = false);
     }
   }
 
   Future<void> _processAndUpload(File file) async {
-    setState(() => _isUploading = true);
+    if (mounted) {
+      setState(() {
+        _isUploading = true;
+        _isPickingImage = false;
+      });
+    }
+
     try {
       final profileService = ProfileService();
 
-      // 1️⃣ Fetch old profile filename
+      // 1. Fetch old profile filename
       final oldProfile = await profileService.fetchProfileFile(userId: widget.userId);
       final oldFileName = oldProfile?.filePath;
 
-      // 2️⃣ Upload new image (the CROPPED one)
+      // 2. Upload new image
       final newFileName = await _storageService.uploadProfileImage(
         userId: widget.userId,
         file: file,
@@ -84,13 +92,13 @@ class _ProfileAvatarUploaderState extends State<ProfileAvatarUploader> {
       );
 
       if (newFileName != null) {
-        // 3️⃣ Update the database
+        // 3. Update the database
         await profileService.updateProfileFilePath(
           userId: widget.userId,
           filePath: newFileName,
         );
 
-        // 4️⃣ Refresh Provider
+        // 4. Refresh Provider
         if (mounted) {
           await context.read<UserProvider>().refreshProfileImage();
         }
@@ -133,7 +141,7 @@ class _ProfileAvatarUploaderState extends State<ProfileAvatarUploader> {
       alignment: Alignment.bottomRight,
       children: [
         GestureDetector(
-          onTap: _isUploading ? null : _pickAndUploadImage,
+          onTap: (_isUploading || _isPickingImage) ? null : _pickAndUploadImage,
           child: CircleAvatar(
             radius: widget.radius,
             backgroundColor: const Color(0xFFE3F2FD),
@@ -146,13 +154,15 @@ class _ProfileAvatarUploaderState extends State<ProfileAvatarUploader> {
         Positioned(
           bottom: 4,
           right: 4,
-          child: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: const BoxDecoration(
-              color: Color(0xFF33A1E0),
-              shape: BoxShape.circle,
+          child: IgnorePointer(
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: const BoxDecoration(
+                color: Color(0xFF33A1E0),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
             ),
-            child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
           ),
         ),
       ],

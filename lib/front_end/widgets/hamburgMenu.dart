@@ -1,22 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../back_end/providers/user_provider.dart';
-import '../../back_end/providers/theme_provider.dart';
-import 'dialog/alert_dialog.dart';
-import 'dialog/logout_dialog.dart';
+import 'package:e_learning_app/back_end/providers/user_provider.dart';
+import 'package:e_learning_app/back_end/providers/theme_provider.dart';
+import 'package:e_learning_app/back_end/services/login/login_service.dart';
+import 'package:e_learning_app/front_end/widgets/dialog/logout_dialog.dart';
 
 // Pages
-import '../student_pages/dashboard/dashboard_page.dart';
-import '../student_pages/courses/courses_page.dart';
-import '../student_pages/tech_library/techlib_page.dart';
-import '../student_pages/knowledge_lab/knowledge_lab_page.dart';
-import '../student_pages/community/community_hub_page.dart';
-import '../profile/profile_page.dart';
-import '../login/login_page.dart';
-
-// Faculty Pages
-import '../faculty_pages/dashboard/f_dashboard_page.dart';
-import '../faculty_pages/user_manager/f_user_manager_page.dart';
+import 'package:e_learning_app/front_end/student_pages/dashboard/dashboard_page.dart';
+import 'package:e_learning_app/front_end/student_pages/courses/courses_page.dart';
+import 'package:e_learning_app/front_end/student_pages/tech_library/techlib_page.dart';
+import 'package:e_learning_app/front_end/student_pages/knowledge_lab/knowledge_lab_page.dart';
+import 'package:e_learning_app/front_end/student_pages/community/community_hub_page.dart';
+import 'package:e_learning_app/front_end/student_pages/ar_lab/ar_lab_page.dart';
+import 'package:e_learning_app/front_end/student_pages/ar_lab/ar_activity_page.dart';
+import 'package:e_learning_app/front_end/widgets/dialog/ar_compatibility_dialog.dart';
+import 'package:e_learning_app/front_end/profile/profile_page.dart';
+import 'package:e_learning_app/front_end/login/login_page.dart';
 
 class AppDrawer extends StatelessWidget {
   final String currentRoute;
@@ -27,8 +26,7 @@ class AppDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer2<UserProvider, ThemeProvider>(
       builder: (context, userProvider, themeProvider, child) {
-        final String role = userProvider.role ?? 'Student';
-        final backend = AppDrawerBackend(context, currentRoute, role, themeProvider);
+        final backend = AppDrawerBackend(context, currentRoute, themeProvider);
 
         return Drawer(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -37,7 +35,7 @@ class AppDrawer extends StatelessWidget {
               children: [
                 const SizedBox(height: 40),
 
-                // Reactive Profile Header
+                // Reactive Profile Header - Clicking this opens the profile
                 GestureDetector(
                   onTap: backend.openProfileOverlay,
                   child: backend.buildProfileHeader(userProvider),
@@ -47,15 +45,9 @@ class AppDrawer extends StatelessWidget {
 
                 // Main menu items
                 Expanded(
-                  child: ListView.separated(
+                  child: ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: backend.mainMenuItems.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final item = backend.mainMenuItems[index];
-                      final isSelected = currentRoute == item.route;
-                      return backend.buildDrawerItem(item, isSelected);
-                    },
+                    children: backend.buildMenu(context),
                   ),
                 ),
 
@@ -85,10 +77,9 @@ class AppDrawer extends StatelessWidget {
 class AppDrawerBackend {
   final BuildContext context;
   final String currentRoute;
-  final String role;
   final ThemeProvider themeProvider;
 
-  AppDrawerBackend(this.context, this.currentRoute, this.role, this.themeProvider);
+  AppDrawerBackend(this.context, this.currentRoute, this.themeProvider);
 
   /// Opens profile page as a slide-up modal
   void openProfileOverlay() {
@@ -159,21 +150,29 @@ class AppDrawerBackend {
   }
 
   Widget _buildProfileImage(String path, String name, Color iconColor) {
+    debugPrint("DEBUG: AppDrawer building profile image with path: $path");
     if (path.startsWith('http')) {
-      return Image.network(
-        path,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _fallbackAvatar(name, iconColor),
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-        },
+      return SizedBox.expand(
+        child: Image.network(
+          path,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            debugPrint("DEBUG: AppDrawer Image.network error: $error");
+            return _fallbackAvatar(name, iconColor);
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+          },
+        ),
       );
     } else if (path.startsWith('assets/')) {
-      return Image.asset(
-        path,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _fallbackAvatar(name, iconColor),
+      return SizedBox.expand(
+        child: Image.asset(
+          path,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _fallbackAvatar(name, iconColor),
+        ),
       );
     } else {
       return _fallbackAvatar(name, iconColor);
@@ -189,56 +188,71 @@ class AppDrawerBackend {
   }
 
   /// Builds a single drawer item
-  Widget buildDrawerItem(DrawerMenuItem item, bool isSelected) {
+  Widget buildDrawerItem(DrawerMenuItem item, bool isSelected, {bool isSubItem = false}) {
     final theme = Theme.of(context);
     final Color primaryColor = theme.colorScheme.primary;
     final Color errorColor = theme.colorScheme.error;
 
     final Color iconColor = item.isLogout
         ? errorColor
-        : isSelected
-            ? primaryColor
-            : theme.iconTheme.color ?? Colors.grey;
+        : !item.isEnabled
+            ? Colors.grey.withOpacity(0.5)
+            : isSelected
+                ? primaryColor
+                : theme.iconTheme.color ?? Colors.grey;
 
     final Color textColor = item.isLogout
         ? errorColor
-        : isSelected
-            ? primaryColor
-            : theme.textTheme.bodyMedium?.color ?? Colors.black87;
+        : !item.isEnabled
+            ? Colors.grey.withOpacity(0.5)
+            : isSelected
+                ? primaryColor
+                : theme.textTheme.bodyMedium?.color ?? Colors.black87;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: item.onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: isSelected ? primaryColor.withOpacity(0.08) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(item.icon, color: iconColor),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                item.title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  color: textColor,
-                  fontFamily: 'Poppins',
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: item.isEnabled ? item.onTap : null,
+        child: Container(
+          padding: EdgeInsets.fromLTRB(isSubItem ? 32 : 16, 12, 16, 12),
+          decoration: BoxDecoration(
+            color: isSelected ? primaryColor.withOpacity(0.08) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(item.icon, color: iconColor, size: isSubItem ? 20 : 24),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: TextStyle(
+                        fontSize: isSubItem ? 14 : 16,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: textColor,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    if (!item.isEnabled)
+                      Text(
+                        "Not supported on this device",
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey.withOpacity(0.7),
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ),
-            if (!item.isLogout && item.route != 'theme')
-              Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey.withOpacity(0.5)),
-            if (item.route == 'theme')
-              Switch(
-                value: themeProvider.isDarkMode,
-                onChanged: (_) => themeProvider.toggleTheme(),
-                activeColor: primaryColor,
-              ),
-          ],
+              if (!item.isLogout && item.route != 'theme' && item.isEnabled)
+                Icon(Icons.arrow_forward_ios, size: 12, color: Colors.grey.withOpacity(0.3)),
+            ],
+          ),
         ),
       ),
     );
@@ -246,97 +260,74 @@ class AppDrawerBackend {
 
   /// Navigates to a page replacing current
   void navigate(Widget page) {
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
+    if (currentRoute == 'home') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page)).then((_) {
+        // This runs when returning to Home from another page (like AR Lab)
+        if (context.mounted && currentRoute == 'home') {
+          // Trigger a data reload on the dashboard if we were there
+          // We can use a global event bus or just rely on the fact that 
+          // most dashboard widgets are consumers.
+        }
+      });
+    } else {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
+    }
   }
 
-  /// Menu items list depends on role
-  List<DrawerMenuItem> get mainMenuItems {
-    if (role == 'Faculty') {
-      return [
-        DrawerMenuItem(
-          title: 'Home',
-          icon: Icons.home_outlined,
-          route: 'home',
-          onTap: () => navigate(const FacultyDashBoardPage()),
+  List<Widget> buildMenu(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final bool isArSelected = currentRoute == 'arlab_activity';
+
+    return [
+      buildDrawerItem(DrawerMenuItem(title: 'Home', icon: Icons.home_outlined, route: 'home', onTap: () => navigate(const DashBoardPage())), currentRoute == 'home'),
+      buildDrawerItem(DrawerMenuItem(title: 'Courses', icon: Icons.menu_book_outlined, route: 'courses', onTap: () => navigate(const CoursesPage())), currentRoute == 'courses'),
+      buildDrawerItem(DrawerMenuItem(title: 'Tech Library', icon: Icons.computer_outlined, route: 'techlib', onTap: () => navigate(const TechLibraryPage())), currentRoute == 'techlib'),
+      buildDrawerItem(DrawerMenuItem(title: 'Knowledge Lab', icon: Icons.science_outlined, route: 'knowledge', onTap: () => navigate(const KnowledgeLabPage())), currentRoute == 'knowledge'),
+      
+      // AR Lab Dropdown-like Expansion
+      GestureDetector(
+        onTap: userProvider.isArSupported ? null : () => ArCompatibilityDialog.show(context),
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            initiallyExpanded: isArSelected,
+            enabled: userProvider.isArSupported,
+            leading: Icon(
+              Icons.view_in_ar_outlined,
+              color: !userProvider.isArSupported 
+                  ? Colors.grey.withOpacity(0.5) 
+                  : isArSelected ? Theme.of(context).colorScheme.primary : (Theme.of(context).iconTheme.color ?? Colors.grey),
+            ),
+            title: Text(
+              'AR Lab',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: isArSelected ? FontWeight.w600 : FontWeight.w500,
+                color: !userProvider.isArSupported 
+                    ? Colors.grey.withOpacity(0.5) 
+                    : isArSelected ? Theme.of(context).colorScheme.primary : (Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black87),
+                fontFamily: 'Poppins',
+              ),
+            ),
+            children: [
+              buildDrawerItem(
+                DrawerMenuItem(
+                  title: 'AR Activity', 
+                  icon: Icons.play_circle_outline, 
+                  route: 'arlab_activity', 
+                  isEnabled: userProvider.isArSupported,
+                  onTap: () => navigate(const ArActivityPage())
+                ), 
+                currentRoute == 'arlab_activity',
+                isSubItem: true
+              ),
+            ],
+          ),
         ),
-        DrawerMenuItem(
-          title: 'Courses',
-          icon: Icons.menu_book_outlined,
-          route: 'courses',
-          onTap: () => CustomAlertDialog().show(context),
-        ),
-        DrawerMenuItem(
-          title: 'Tech Library',
-          icon: Icons.computer_outlined,
-          route: 'techlib',
-          onTap: () => CustomAlertDialog().show(context),
-        ),
-        DrawerMenuItem(
-          title: 'Knowledge Lab',
-          icon: Icons.science_outlined,
-          route: 'knowledge',
-          onTap: () => CustomAlertDialog().show(context),
-        ),
-        DrawerMenuItem(
-          title: 'User Manager',
-          icon: Icons.manage_accounts_outlined,
-          route: 'user_manager',
-          onTap: () => navigate(const FacultyUserManagerPage()),
-        ),
-        DrawerMenuItem(
-          title: 'Community Hub',
-          icon: Icons.groups_outlined,
-          route: 'community',
-          onTap: () => navigate(const CommunityHubPage()),
-        ),
-        DrawerMenuItem(
-          title: 'My Profile',
-          icon: Icons.person_outline,
-          route: 'profile',
-          onTap: () => navigate(const ProfilePage()),
-        ),
-      ];
-    } else {
-      // Student Menu
-      return [
-        DrawerMenuItem(
-          title: 'Home',
-          icon: Icons.home_outlined,
-          route: 'home',
-          onTap: () => navigate(const DashBoardPage()),
-        ),
-        DrawerMenuItem(
-          title: 'Courses',
-          icon: Icons.menu_book_outlined,
-          route: 'courses',
-          onTap: () => navigate(const CoursesPage()),
-        ),
-        DrawerMenuItem(
-          title: 'Tech Library',
-          icon: Icons.computer_outlined,
-          route: 'techlib',
-          onTap: () => navigate(const TechLibraryPage()),
-        ),
-        DrawerMenuItem(
-          title: 'Knowledge Lab',
-          icon: Icons.science_outlined,
-          route: 'knowledge',
-          onTap: () => navigate(const KnowledgeLabPage()),
-        ),
-        DrawerMenuItem(
-          title: 'AR Lab',
-          icon: Icons.view_in_ar_outlined,
-          route: 'arlab',
-          onTap: () => CustomAlertDialog().show(context),
-        ),
-        DrawerMenuItem(
-          title: 'Community Hub',
-          icon: Icons.groups_outlined,
-          route: 'community',
-          onTap: () => navigate(const CommunityHubPage()),
-        ),
-      ];
-    }
+      ),
+
+      buildDrawerItem(DrawerMenuItem(title: 'Community Hub', icon: Icons.groups_outlined, route: 'community', onTap: () => navigate(const CommunityHubPage())), currentRoute == 'community'),
+    ];
   }
 
   DrawerMenuItem get themeItem => DrawerMenuItem(
@@ -357,22 +348,30 @@ class AppDrawerBackend {
   void _handleLogout() {
     LogoutDialog.show(
       context: context,
-      onLogout: () {
-        Navigator.of(context, rootNavigator: true).pushReplacement(
-          MaterialPageRoute(builder: (_) => const LogInForm()),
-        );
+      onLogout: () async {
+        try {
+          await AuthService().signOut();
+          if (!context.mounted) return;
+          Provider.of<UserProvider>(context, listen: false).clearUser();
+          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LogInForm()),
+            (route) => false,
+          );
+        } catch (e) {
+          debugPrint("Logout Error: $e");
+        }
       },
     );
   }
 }
 
-/// Drawer menu item models
 class DrawerMenuItem {
   final String title;
   final IconData icon;
   final String route;
   final VoidCallback onTap;
   final bool isLogout;
+  final bool isEnabled;
 
   const DrawerMenuItem({
     required this.title,
@@ -380,5 +379,6 @@ class DrawerMenuItem {
     required this.route,
     required this.onTap,
     this.isLogout = false,
+    this.isEnabled = true,
   });
 }

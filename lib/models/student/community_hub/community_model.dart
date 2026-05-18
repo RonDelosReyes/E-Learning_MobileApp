@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 
 class CommunityMember {
   final int userId;

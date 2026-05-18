@@ -4,9 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'back_end/providers/user_provider.dart';
 import 'back_end/providers/theme_provider.dart';
+import 'back_end/providers/community_provider.dart';
+import 'back_end/providers/knowledge_lab_provider.dart';
 import 'back_end/utils/app_entry.dart';
 
 // Global key to access the navigator from anywhere
@@ -14,6 +16,13 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint("Error loading .env file: $e");
+  }
 
   // Force portrait ONLY on mobile
   if (defaultTargetPlatform == TargetPlatform.android ||
@@ -41,6 +50,8 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => CommunityProvider()),
+        ChangeNotifierProvider(create: (_) => KnowledgeLabProvider()),
       ],
       child: const MyApp(),
     ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pdfx/pdfx.dart';
+import 'package:http/http.dart' as http;
 
 class PdfViewerPage extends StatefulWidget {
   final String url;
@@ -13,8 +13,9 @@ class PdfViewerPage extends StatefulWidget {
 }
 
 class _PdfViewerPageState extends State<PdfViewerPage> {
-  late PdfControllerPinch _pdfController;
+  PdfControllerPinch? _pdfController;
   bool isLoading = true;
+  String? errorMessage;
 
   @override
   void initState() {
@@ -24,41 +25,101 @@ class _PdfViewerPageState extends State<PdfViewerPage> {
 
   Future<void> _loadPdf() async {
     try {
-      final pdfData = (await NetworkAssetBundle(Uri.parse(widget.url)).load(widget.url))
-          .buffer
-          .asUint8List();
+      final response = await http.get(Uri.parse(widget.url));
+      
+      if (response.statusCode == 200) {
+        final pdfData = response.bodyBytes;
 
-      _pdfController = PdfControllerPinch(
-        document: PdfDocument.openData(pdfData),
-      );
+        _pdfController = PdfControllerPinch(
+          document: PdfDocument.openData(pdfData),
+        );
 
-      setState(() => isLoading = false);
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+          });
+        }
+      } else {
+        throw Exception("Failed to download PDF: \${response.statusCode}");
+      }
     } catch (e) {
-      debugPrint("Error loading PDF: $e");
-      setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to load PDF.")),
-      );
+      debugPrint("Error loading PDF: \$e");
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          errorMessage = "Failed to load PDF.";
+        });
+      }
     }
   }
 
   @override
   void dispose() {
-    _pdfController.dispose();
+    _pdfController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final backgroundColor = theme.scaffoldBackgroundColor;
+    final textColor = theme.textTheme.titleLarge?.color ?? Colors.white;
+
     return Scaffold(
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF33A1E0),
-        title: Text(widget.title),
+        centerTitle: true,
+        backgroundColor: primaryColor,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white, size: 24),
+        title: Text(
+          widget.title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontFamily: 'Poppins',
+          ),
+        ),
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : PdfViewPinch(
-        controller: _pdfController,
+      body: _buildBody(backgroundColor, textColor),
+    );
+  }
+
+  Widget _buildBody(Color backgroundColor, Color textColor) {
+    if (isLoading) {
+      return Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
+        ),
+      );
+    }
+
+    if (errorMessage != null) {
+      return Center(
+        child: Text(
+          errorMessage!,
+          style: TextStyle(color: textColor, fontFamily: 'Poppins'),
+        ),
+      );
+    }
+
+    if (_pdfController == null) {
+      return Center(
+        child: Text(
+          "Unable to initialize PDF viewer.",
+          style: TextStyle(color: textColor, fontFamily: 'Poppins'),
+        ),
+      );
+    }
+
+    return Container(
+      color: backgroundColor,
+      child: PdfViewPinch(
+        controller: _pdfController!,
+        backgroundDecoration: BoxDecoration(color: backgroundColor),
       ),
     );
   }

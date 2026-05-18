@@ -2,20 +2,43 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../connection/db_connect.dart';
 
 class RegistrationService {
+  /// Checks if a student number exists in tbl_student and is not yet linked to an auth account.
+  Future<Map<String, dynamic>?> verifyStudentNo(String studentNo) async {
+    try {
+      final res = await supabase
+          .from('tbl_student')
+          .select('*, tbl_user!inner(*), tbl_program!inner(program_name)')
+          .eq('student_no', studentNo)
+          .maybeSingle();
+
+      if (res == null) return null;
+
+      final userData = res['tbl_user'];
+      if (userData['auth_id'] != null) {
+        throw 'This student number is already registered.';
+      }
+
+      return {
+        'student_id': res['student_id'],
+        'user_id': userData['user_id'],
+        'firstName': userData['firstName'],
+        'middleName': userData['middleName'],
+        'lastName': userData['lastName'],
+        'program_name': res['tbl_program']['program_name'],
+      };
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   /// Registers a student by creating a Supabase Auth user and then
-  /// populating the public.tbl_user and public.tbl_student tables.
+  /// updating the public.tbl_user table with the auth_id.
   Future<void> registerStudent({
-    required String firstName,
-    required String middleInitial,
-    required String lastName,
-    required String contactNo,
+    required int userId,
     required String email,
     required String password,
-    required String studentNum,
-    required String yearLevel,
   }) async {
     // 1. Sign up using Supabase Auth
-    // This will trigger the confirmation email.
     final AuthResponse res = await supabase.auth.signUp(
       email: email.trim(),
       password: password,
@@ -28,26 +51,12 @@ class RegistrationService {
     }
 
     try {
-      // 2. Insert into public.tbl_user using the auth_id from Supabase Auth
-      final userRes = await supabase.from('tbl_user').insert({
+      // 2. Update existing record in public.tbl_user
+      await supabase.from('tbl_user').update({
         'auth_id': user.id,
-        'firstName': firstName,
-        'middleInitial': middleInitial.isEmpty ? null : middleInitial,
-        'lastName': lastName,
-        'contact_no': contactNo,
-        'status_no': 1, // Set to Active directly as verification is via Supabase
-      }).select().single();
-
-      final int userId = userRes['user_id'];
-
-      // 3. Insert into public.tbl_student
-      await supabase.from('tbl_student').insert({
-        'user_no': userId,
-        'student_num': studentNum,
-        'year_level': yearLevel,
-      });
+        'status_no': 3, // Set to Pending (3) until email is verified and they log in
+      }).eq('user_id', userId);
     } catch (e) {
-      // Let the UI handle the exceptions specifically
       rethrow;
     }
   }

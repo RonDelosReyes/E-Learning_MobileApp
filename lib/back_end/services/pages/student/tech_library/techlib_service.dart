@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../../connection/db_connect.dart';
-import '../../../../../models/student/tech_library/resource_model.dart';
+import 'package:e_learning_app/back_end/connection/db_connect.dart';
+import 'package:e_learning_app/models/student/tech_library/resource_model.dart';
 
 class TechLibraryService {
   final SupabaseClient _supabase = supabase;
@@ -17,6 +17,7 @@ class TechLibraryService {
 
   Future<List<ResourceModel>> fetchResources({int? typeId}) async {
     try {
+      // Joining tbl_admin and then tbl_user to get uploader details
       var query = _supabase.from('tbl_resource').select('''
         resource_id,
         title,
@@ -24,7 +25,9 @@ class TechLibraryService {
         date_uploaded,
         tbl_type(type),
         tbl_category(category),
-        tbl_user(firstName, lastName)
+        tbl_admin(
+          tbl_user(firstName, lastName)
+        )
       ''');
 
       if (typeId != null) {

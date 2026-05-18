@@ -5,93 +5,80 @@ class LogoutDialog {
     required BuildContext context,
     required VoidCallback onLogout,
   }) async {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final errorColor = theme.colorScheme.error;
+
     showDialog(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
       builder: (dialogContext) {
-        const primaryBlue = Color(0xFF1565C0);
-
         return Dialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          elevation: 10,
+          backgroundColor: theme.cardColor,
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-
-                // 🔵 Icon
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: primaryBlue.withOpacity(0.1),
+                    color: errorColor.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.logout,
-                    color: primaryBlue,
-                    size: 30,
+                  child: Icon(
+                    Icons.logout_rounded,
+                    color: errorColor,
+                    size: 40,
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
-                // 🔤 Title
-                const Text(
+                Text(
                   "Logout",
-                  style: TextStyle(
-                    fontSize: 20,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins',
                   ),
                 ),
-
-                const SizedBox(height: 10),
-
-                // 📝 Message
-                const Text(
+                const SizedBox(height: 12),
+                Text(
                   "Are you sure you want to log out of your account?",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.black54,
-                    fontSize: 14,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.textTheme.bodySmall?.color,
+                    fontFamily: 'Poppins',
                   ),
                 ),
-
                 const SizedBox(height: 28),
-
-                // 🔘 Buttons Row
                 Row(
                   children: [
-
-                    // Cancel Button (Secondary)
                     Expanded(
-                      child: OutlinedButton(
+                      child: TextButton(
                         onPressed: () {
                           Navigator.of(dialogContext, rootNavigator: true).pop();
                         },
-                        style: OutlinedButton.styleFrom(
+                        style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: const BorderSide(color: primaryBlue),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text(
+                        child: Text(
                           "Cancel",
                           style: TextStyle(
-                            color: primaryBlue,
+                            color: theme.textTheme.bodySmall?.color,
                             fontWeight: FontWeight.w600,
+                            fontFamily: 'Poppins',
                           ),
                         ),
                       ),
                     ),
-
                     const SizedBox(width: 12),
-
-                    // Logout Button (Primary)
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
@@ -99,18 +86,19 @@ class LogoutDialog {
                           onLogout();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryBlue,
+                          backgroundColor: errorColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          elevation: 2,
                         ),
                         child: const Text(
                           "Logout",
                           style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
                           ),
                         ),
                       ),

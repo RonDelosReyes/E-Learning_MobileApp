@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../widgets/primary_appbar.dart';
-import '../../widgets/hamburgMenu.dart';
-import '../../widgets/pdf_viewer_page.dart';
-import '../../../back_end/services/pages/student/tech_library/techlib_service.dart';
-import '../../../models/student/tech_library/resource_model.dart';
+import 'package:e_learning_app/back_end/services/pages/student/tech_library/techlib_service.dart';
+import 'package:e_learning_app/models/student/tech_library/resource_model.dart';
+import 'package:e_learning_app/front_end/widgets/hamburgMenu.dart';
+import 'package:e_learning_app/front_end/widgets/pdf_viewer_page.dart';
+import 'package:e_learning_app/front_end/widgets/media_viewer_page.dart';
 
 class TechLibraryPage extends StatefulWidget {
   const TechLibraryPage({super.key});
@@ -15,10 +15,9 @@ class TechLibraryPage extends StatefulWidget {
 
 class _TechLibraryPageState extends State<TechLibraryPage> {
   final TechLibraryService _service = TechLibraryService();
-  
   List<ResourceType> _types = [];
   List<ResourceModel> _resources = [];
-  int? _selectedTypeId; // null means "All"
+  int? _selectedTypeId;
   bool _isLoading = true;
 
   @override
@@ -28,22 +27,30 @@ class _TechLibraryPageState extends State<TechLibraryPage> {
   }
 
   Future<void> _loadData() async {
-    if (!mounted) return;
     setState(() => _isLoading = true);
-    try {
-      final types = await _service.fetchResourceTypes();
-      final resources = await _service.fetchResources(typeId: _selectedTypeId);
-      
-      if (mounted) {
-        setState(() {
-          _types = types;
-          _resources = resources;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("TECH_LIB_ERROR: $e");
-      if (mounted) setState(() => _isLoading = false);
+    final results = await Future.wait([
+      _service.fetchResourceTypes(),
+      _service.fetchResources(typeId: _selectedTypeId),
+    ]);
+    if (mounted) {
+      setState(() {
+        _types = results[0] as List<ResourceType>;
+        _resources = results[1] as List<ResourceModel>;
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _openResource(ResourceModel resource) {
+    final type = resource.type.toLowerCase();
+    if (type.contains('pdf')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => PdfViewerPage(url: resource.fileUrl, title: resource.title)));
+    } else if (type.contains('video')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => MediaViewerPage(url: resource.fileUrl, title: resource.title, type: 'video')));
+    } else if (type.contains('image')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => MediaViewerPage(url: resource.fileUrl, title: resource.title, type: 'image')));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Format not supported for direct viewing.")));
     }
   }
 
@@ -51,195 +58,159 @@ class _TechLibraryPageState extends State<TechLibraryPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
-    final onPrimary = theme.colorScheme.onPrimary;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: const PrimaryAppBar(title: "Tech Library"),
+      appBar: AppBar(
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: primaryColor,
+        iconTheme: const IconThemeData(color: Colors.white, size: 28),
+        title: const Text(
+          'Tech Library',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontFamily: 'Poppins',
+            letterSpacing: 1.2,
+          ),
+        ),
+      ),
       drawer: const AppDrawer(currentRoute: 'techlib'),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ===== Header Banner =====
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [primaryColor, primaryColor.withOpacity(0.7)],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Learning Resources 📚",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: onPrimary,
-                        fontFamily: 'Poppins',
+      body: Column(
+        children: [
+          // Banner Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+            decoration: BoxDecoration(
+              color: primaryColor,
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        "Learning Resources 📚",
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Poppins'),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "Access modules, references, and study materials.",
-                      style: TextStyle(color: onPrimary.withOpacity(0.7), fontFamily: 'Poppins'),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // ===== Category Filter =====
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _categoryChip("All", null),
-                    ..._types.map((type) => Padding(
-                      padding: const EdgeInsets.only(left: 10),
-                      child: _categoryChip(type.type, type.id),
-                    )),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              if (_isLoading)
-                Center(child: CircularProgressIndicator(color: primaryColor))
-              else if (_resources.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 40),
-                  child: Center(child: Text("No resources found.", style: TextStyle(fontFamily: 'Poppins'))),
-                )
-              else
-                ..._resources.map((res) => Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: ModernTechFileCard(
-                    resource: res,
-                    onRead: () {
-                      if (res.type.toUpperCase() == 'PDF') {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => PdfViewerPage(
-                              url: res.fileUrl,
-                              title: res.title,
-                            ),
-                          ),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Opening ${res.type} is not supported yet.")),
-                        );
-                      }
-                    },
+                    ],
                   ),
-                )),
-            ],
+                  const SizedBox(height: 8),
+                  Text(
+                    "Access modules, references, and study materials.",
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12, fontFamily: 'Poppins'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                _buildFilterChip(context, "All", _selectedTypeId == null, () {
+                  setState(() => _selectedTypeId = null);
+                  _loadData();
+                }),
+                ..._types.map((type) => _buildFilterChip(context, type.type, _selectedTypeId == type.id, () {
+                  setState(() => _selectedTypeId = type.id);
+                  _loadData();
+                })),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: _isLoading
+                ? Center(child: CircularProgressIndicator(color: primaryColor))
+                : RefreshIndicator(
+                    onRefresh: _loadData,
+                    color: primaryColor,
+                    child: _resources.isEmpty
+                        ? const Center(child: Text("No resources found.", style: TextStyle(fontFamily: 'Poppins')))
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            itemCount: _resources.length,
+                            itemBuilder: (context, index) {
+                              return _buildResourceCard(_resources[index], theme);
+                            },
+                          ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(BuildContext context, String label, bool isSelected, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? primaryColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isSelected ? Colors.transparent : Colors.grey.withValues(alpha: 0.3)),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.grey,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              fontFamily: 'Poppins',
+              fontSize: 13,
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _categoryChip(String label, int? typeId) {
-    final theme = Theme.of(context);
+  Widget _buildResourceCard(ResourceModel res, ThemeData theme) {
     final primaryColor = theme.colorScheme.primary;
-    final onPrimary = theme.colorScheme.onPrimary;
-    final bool isSelected = _selectedTypeId == typeId;
-
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      showCheckmark: false,
-      onSelected: (val) {
-        if (val) {
-          setState(() => _selectedTypeId = typeId);
-          _loadData();
-        }
-      },
-      selectedColor: primaryColor,
-      backgroundColor: theme.cardTheme.color,
-      labelStyle: TextStyle(
-        color: isSelected ? onPrimary : primaryColor,
-        fontWeight: FontWeight.w600,
-        fontFamily: 'Poppins',
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(30),
-        side: BorderSide(color: primaryColor),
-      ),
-    );
-  }
-}
-
-// ================= MODERN FILE CARD =================
-
-class ModernTechFileCard extends StatelessWidget {
-  final ResourceModel resource;
-  final VoidCallback onRead;
-
-  const ModernTechFileCard({
-    super.key,
-    required this.resource,
-    required this.onRead,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
-    final isDark = theme.brightness == Brightness.dark;
-
-    IconData getIcon() {
-      switch (resource.type.toUpperCase()) {
-        case 'PDF': return Icons.picture_as_pdf;
-        case 'VIDEO': return Icons.video_library;
-        case 'IMAGE': return Icons.image;
-        case 'PPTX': return Icons.slideshow;
-        case 'DOCX': return Icons.description;
-        case 'XLSX': return Icons.table_chart;
-        default: return Icons.insert_drive_file;
-      }
-    }
-
+    
     return Container(
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: isDark ? null : const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          )
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      child: InkWell(
+        onTap: () => _openResource(res),
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
             children: [
-              // File Icon Container
               Container(
-                height: 50,
-                width: 50,
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  color: primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(getIcon(), color: primaryColor),
+                child: Icon(_getIconForType(res.type), color: primaryColor, size: 28),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -247,68 +218,61 @@ class ModernTechFileCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      resource.title,
-                      maxLines: 2,
+                      res.title,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, fontFamily: 'Poppins'),
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        fontFamily: 'Poppins',
-                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "By: ${resource.uploaderName}",
-                      style: theme.textTheme.bodySmall?.copyWith(fontSize: 12, fontFamily: 'Poppins'),
+                      "By: ${res.uploaderName}",
+                      style: TextStyle(fontSize: 11, color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7), fontStyle: FontStyle.italic),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _tag(res.category, Colors.blue),
+                        _tag(res.type, Colors.orange),
+                        Text(
+                          DateFormat('MMM dd, yyyy').format(res.dateUploaded),
+                          style: TextStyle(fontSize: 10, color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.5)),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: onRead,
-                icon: Icon(Icons.arrow_forward_ios,
-                    size: 18, color: theme.textTheme.bodySmall?.color),
-              ),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right, size: 20, color: Colors.grey.withValues(alpha: 0.5)),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  _infoBadge(resource.category, Colors.blue),
-                  const SizedBox(width: 8),
-                  _infoBadge(resource.type, Colors.orange),
-                ],
-              ),
-              Text(
-                DateFormat('MMM dd, yyyy').format(resource.dateUploaded),
-                style: theme.textTheme.bodySmall?.copyWith(fontSize: 11, fontFamily: 'Poppins'),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _infoBadge(String label, Color color) {
+  Widget _tag(String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontSize: 10,
-          color: color,
-          fontWeight: FontWeight.bold,
-          fontFamily: 'Poppins',
-        ),
+        style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.bold, fontFamily: 'Poppins'),
       ),
     );
+  }
+
+  IconData _getIconForType(String type) {
+    type = type.toLowerCase();
+    if (type.contains('pdf')) return Icons.picture_as_pdf_rounded;
+    if (type.contains('video')) return Icons.play_circle_fill_rounded;
+    if (type.contains('image')) return Icons.image_rounded;
+    return Icons.description_rounded;
   }
 }

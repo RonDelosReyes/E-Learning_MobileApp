@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:e_learning_app/theme/app_theme.dart';
-import '../../back_end/controllers/login/login_controller.dart';
+import 'package:e_learning_app/back_end/controllers/login/login_controller.dart';
 import '../widgets/login/register_form.dart';
 import '../widgets/login/forgot_pass_modal.dart';
+import '../widgets/primary_button.dart';
 
 class LogInForm extends StatefulWidget {
   const LogInForm({super.key});
@@ -12,16 +14,41 @@ class LogInForm extends StatefulWidget {
 }
 
 class _LogInFormState extends State<LogInForm> {
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+  final LoginController _controller = LoginController();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _rememberMe = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberedEmail();
+  }
+
+  Future<void> _loadRememberedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('remembered_email');
+    if (savedEmail != null && savedEmail.isNotEmpty) {
+      setState(() {
+        _controller.emailController.text = savedEmail;
+        _rememberMe = true;
+      });
+    }
+  }
+
+  Future<void> _saveRememberMe() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberMe) {
+      await prefs.setString('remembered_email', _controller.emailController.text.trim());
+    } else {
+      await prefs.remove('remembered_email');
+    }
+  }
 
   @override
   void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -50,7 +77,7 @@ class _LogInFormState extends State<LogInForm> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12 * scale),
         borderSide: BorderSide(
-          color: AppColors.loginButtonBlue,
+          color: theme.colorScheme.primary,
           width: 1.5,
         ),
       ),
@@ -70,6 +97,8 @@ class _LogInFormState extends State<LogInForm> {
     final screenHeight = mediaQuery.size.height;
     final double scale = (screenWidth / 375.0).clamp(0.85, 1.2);
     final boxWidth = screenWidth * 0.9;
+    final themeExt = theme.extension<AppGradient>();
+    final gradient = themeExt?.primary;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -131,7 +160,7 @@ class _LogInFormState extends State<LogInForm> {
                                 fontSize: 32 * scale,
                                 fontWeight: FontWeight.w900,
                                 fontFamily: 'Poppins',
-                                color: isDark ? Colors.white : AppColors.loginTitleBlue,
+                                color: themeExt?.loginTitle ?? (isDark ? Colors.white : AppColors.loginTitleBlue),
                                 letterSpacing: -0.5,
                               ),
                             ),
@@ -159,7 +188,8 @@ class _LogInFormState extends State<LogInForm> {
                                     width: double.infinity,
                                     padding: EdgeInsets.symmetric(vertical: 20 * scale),
                                     decoration: BoxDecoration(
-                                      color: AppColors.loginButtonBlue,
+                                      color: gradient == null ? theme.colorScheme.primary : null,
+                                      gradient: gradient,
                                       borderRadius: BorderRadius.vertical(
                                         top: Radius.circular(24 * scale),
                                       ),
@@ -187,14 +217,14 @@ class _LogInFormState extends State<LogInForm> {
                                     child: Column(
                                       children: [
                                         TextField(
-                                          controller: emailController,
+                                          controller: _controller.emailController,
                                           decoration: _inputStyle(context, 'Email Address', scale),
                                           style: TextStyle(fontSize: 15 * scale, color: isDark ? Colors.white : Colors.black87),
                                           keyboardType: TextInputType.emailAddress,
                                         ),
                                         SizedBox(height: 20 * scale),
                                         TextField(
-                                          controller: passwordController,
+                                          controller: _controller.passwordController,
                                           obscureText: _obscurePassword,
                                           style: TextStyle(fontSize: 15 * scale, color: isDark ? Colors.white : Colors.black87),
                                           decoration: _inputStyle(
@@ -213,71 +243,65 @@ class _LogInFormState extends State<LogInForm> {
                                         ),
                                         
                                         SizedBox(height: 12 * scale),
-                                        Align(
-                                          alignment: Alignment.centerRight,
-                                          child: GestureDetector(
-                                            onTap: () {
-                                              showDialog(
-                                                context: context,
-                                                builder: (_) => const ForgotPassModal(),
-                                              );
-                                            },
-                                            child: Text(
-                                              'Forgot Password?',
-                                              style: TextStyle(
-                                                color: isDark ? AppColors.loginLinkDark : AppColors.loginLinkBlue,
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 13 * scale,
-                                                fontFamily: 'Poppins',
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                SizedBox(
+                                                  height: 24 * scale,
+                                                  width: 24 * scale,
+                                                  child: Checkbox(
+                                                    value: _rememberMe,
+                                                    activeColor: theme.colorScheme.primary,
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4 * scale)),
+                                                    onChanged: (val) => setState(() => _rememberMe = val ?? false),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'Remember Me',
+                                                  style: TextStyle(
+                                                    color: theme.textTheme.bodySmall?.color,
+                                                    fontSize: 12 * scale,
+                                                    fontFamily: 'Poppins',
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            GestureDetector(
+                                              onTap: () {
+                                                showDialog(
+                                                  context: context,
+                                                  builder: (_) => const ForgotPassModal(),
+                                                );
+                                              },
+                                              child: Text(
+                                                'Forgot Password?',
+                                                style: TextStyle(
+                                                  color: themeExt?.loginLink ?? (isDark ? AppColors.loginLinkDark : AppColors.loginLinkBlue),
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 12 * scale,
+                                                  fontFamily: 'Poppins',
+                                                ),
                                               ),
                                             ),
-                                          ),
+                                          ],
                                         ),
                                         
                                         SizedBox(height: 32 * scale),
                                         
-                                        SizedBox(
-                                          width: double.infinity,
-                                          height: 56 * scale,
-                                          child: ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppColors.loginButtonBlue,
-                                              foregroundColor: Colors.white,
-                                              elevation: 0,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(14 * scale),
-                                              ),
-                                            ),
-                                            onPressed: _isLoading
-                                                ? null
-                                                : () async {
-                                                    setState(() => _isLoading = true);
-                                                    await UserLoginController().handleLogin(
-                                                      context: context,
-                                                      email: emailController.text.trim(),
-                                                      password: passwordController.text,
-                                                    );
-                                                    if (mounted) setState(() => _isLoading = false);
-                                                  },
-                                            child: _isLoading
-                                                ? SizedBox(
-                                                    height: 24 * scale,
-                                                    width: 24 * scale,
-                                                    child: CircularProgressIndicator(
-                                                      color: Colors.white,
-                                                      strokeWidth: 2.5 * scale,
-                                                    ),
-                                                  )
-                                                : Text(
-                                                    'LOGIN',
-                                                    style: TextStyle(
-                                                      fontSize: 16 * scale,
-                                                      fontWeight: FontWeight.bold,
-                                                      fontFamily: 'Poppins',
-                                                      letterSpacing: 1,
-                                                    ),
-                                                  ),
-                                          ),
+                                        PrimaryButton(
+                                          text: 'LOGIN',
+                                          isLoading: _isLoading,
+                                          borderRadius: 14 * scale,
+                                          fontSize: 16 * scale,
+                                          onPressed: () async {
+                                            setState(() => _isLoading = true);
+                                            await _saveRememberMe();
+                                            await _controller.login(context);
+                                            if (mounted) setState(() => _isLoading = false);
+                                          },
                                         ),
                                       ],
                                     ),
@@ -312,7 +336,7 @@ class _LogInFormState extends State<LogInForm> {
                                   child: Text(
                                     'Register Now',
                                     style: TextStyle(
-                                      color: isDark ? AppColors.loginLinkDark : AppColors.loginLinkBlue,
+                                      color: themeExt?.loginLink ?? (isDark ? AppColors.loginLinkDark : AppColors.loginLinkBlue),
                                       fontWeight: FontWeight.bold,
                                       fontFamily: 'Poppins',
                                       fontSize: 14 * scale,

@@ -1,22 +1,68 @@
 import '../../services/profile/otp_service.dart';
+import '../../utils/email_validator.dart';
 
 class OtpController {
   final OtpService _service = OtpService();
 
-  Future<void> sendOtp(String newEmail) async {
-    return await _service.sendEmailChangeOtp(newEmail);
+  /// Legacy method
+  Future<void> sendOtp(String email) async {
+    await requestEmailVerification(email);
   }
 
-  Future<void> verifyOtp(String newEmail, String token) async {
-    return await _service.verifyEmailChangeOtp(newEmail, token);
+  /// Sends password reset OTP to current email
+  Future<void> sendPasswordResetOtp(String currentEmail) async {
+    return await _service.sendPasswordResetOtp(currentEmail);
   }
 
-  Future<void> updateStatusToActive(String authId) async {
-    return await _service.updateUserStatusToActive(authId);
+  /// Request verification for email change
+  Future<bool> requestEmailVerification(String email) async {
+    final bool exists = await EmailValidator.isEmailTaken(email);
+    if (exists) {
+      await _service.sendDirectOtp(email);
+      return true;
+    } else {
+      await _service.sendVerificationLink(email);
+      return false;
+    }
   }
-  
-  // For Resend functionality in OtpModal
-  Future<void> sendVerificationOtp(String email) async {
-    return await _service.sendEmailChangeOtp(email);
+
+  Future<void> sendDirectOtp(String email) async {
+    return await _service.sendDirectOtp(email);
+  }
+
+  /// Consolidated verify and apply for Email, Password, or both
+  Future<void> verifyAndApplyAccountChanges({
+    String? newEmail, 
+    required String token,
+    String? newPassword,
+    required String targetAuthId,
+    bool isFromLink = false,
+  }) async {
+    return await _service.verifyAndApplyAccountChanges(
+      newEmail: newEmail, 
+      emailToken: token,
+      newPassword: newPassword,
+      targetAuthId: targetAuthId,
+      isFromLink: isFromLink,
+    );
+  }
+
+  /// Alias for compatibility
+  Future<void> verifyAndChangeEmail({
+    required String newEmail, 
+    required String token,
+    required String targetAuthId,
+    bool isFromLink = false,
+  }) async {
+    return await verifyAndApplyAccountChanges(
+      newEmail: newEmail,
+      token: token,
+      targetAuthId: targetAuthId,
+      isFromLink: isFromLink,
+    );
+  }
+
+  Future<void> sendEmailChangeOtp(String email) async {
+    await requestEmailVerification(email);
   }
 }

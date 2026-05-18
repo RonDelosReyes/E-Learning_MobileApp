@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-// Courses
-import 'package:e_learning_app/front_end/student_pages/courses/basic_computer_parts.dart';
-import 'package:e_learning_app/front_end/student_pages/courses/com_repair.dart';
-import 'package:e_learning_app/front_end/student_pages/courses/intro_to_comnet.dart';
-import 'package:e_learning_app/front_end/student_pages/courses/os_concepts.dart';
-
-// Services & Providers
+// Models & Controllers
+import 'package:e_learning_app/models/student/course/course_model.dart';
+import 'package:e_learning_app/back_end/controllers/student/course/course_controller.dart';
 import 'package:e_learning_app/back_end/services/pages/student/course/course_service.dart';
+
+// Pages
+import 'package:e_learning_app/front_end/student_pages/courses/course_details_page.dart';
+
+// Providers
 import 'package:e_learning_app/back_end/providers/user_provider.dart';
 
 // Widgets
@@ -22,39 +23,45 @@ class CoursesPage extends StatefulWidget {
   State<CoursesPage> createState() => _CoursesPageState();
 }
 
-final List<int> courseOrder = [1, 2, 3, 4];
-
 class _CoursesPageState extends State<CoursesPage> {
+  final CourseController _controller = CourseController();
   final CoursesService _service = CoursesService();
-
+  
   bool _isLoading = true;
+  List<CourseModel> _allCourses = [];
   List<Map<String, dynamic>> _courseProgress = [];
 
   @override
   void initState() {
     super.initState();
-    _loadProgress();
+    _loadData();
   }
 
-  Future<void> _loadProgress() async {
-    final studentId = context.read<UserProvider>().studentId;
-    if (studentId == null) {
+  Future<void> _loadData() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    
+    try {
+      final userProvider = context.read<UserProvider>();
+      final userId = userProvider.userId;
+      
+      // Fetch both all courses and the user's progress
+      final results = await Future.wait([
+        _service.fetchAllCourses(),
+        if (userId != null) _controller.getCourseProgress(userId) else Future.value(<Map<String, dynamic>>[]),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _allCourses = results[0] as List<CourseModel>;
+          _courseProgress = results[1] as List<Map<String, dynamic>>;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading courses: $e");
       if (mounted) setState(() => _isLoading = false);
-      return;
     }
-    final progress = await _service.fetchCourseProgress(studentId);
-
-    if (mounted) {
-      setState(() {
-        _courseProgress = progress;
-        _isLoading = false;
-      });
-    }
-  }
-
-  double _getProgressNormalized(int courseId) {
-    final value = _service.getProgress(_courseProgress, courseId);
-    return value / 100;
   }
 
   @override
@@ -69,111 +76,98 @@ class _CoursesPageState extends State<CoursesPage> {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: const PrimaryAppBar(title: "COURSES"),
       drawer: const AppDrawer(currentRoute: 'courses'),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: primaryColor))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ===== Header Card =====
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [primaryColor, secondaryColor],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ===== Header Card =====
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [primaryColor, secondaryColor],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Continue Learning, $firstName 👋",
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: onPrimary,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Continue Learning, $firstName 👋",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: onPrimary,
+                              fontFamily: 'Poppins',
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          "Track your progress and unlock new knowledge.",
-                          style: TextStyle(color: onPrimary.withOpacity(0.7)),
-                        ),
-                      ],
+                          const SizedBox(height: 6),
+                          Text(
+                            "Track your progress and unlock new knowledge.",
+                            style: TextStyle(
+                              color: onPrimary.withAlpha(179),
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 28),
+                    const SizedBox(height: 28),
 
-                  Text(
-                    "Your Enrolled Courses",
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
+                    Text(
+                      "Your Enrolled Courses",
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Poppins',
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  ..._buildCourseList(),
-                ],
+                    if (_allCourses.isEmpty)
+                      const Center(child: Text("No courses available at the moment."))
+                    else
+                      ..._buildCourseList(),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 
   List<Widget> _buildCourseList() {
-    final List<Map<String, dynamic>> courses = [
-      {
-        'id': 1,
-        'title': "Basic Computer Parts",
-        'instructor': "Prof. Dela Cruz",
-        'page': const BasicComputerPartsPage(),
-      },
-      {
-        'id': 2,
-        'title': "Operating System Concepts",
-        'instructor': "Prof. Santos",
-        'page': const OperatingSystemConceptsPage(),
-      },
-      {
-        'id': 3,
-        'title': "Intro to Computer Networking",
-        'instructor': "Ms. Garcia",
-        'page': const FundamentalsOfComputerNetworkingPage(),
-      },
-      {
-        'id': 4,
-        'title': "Computer Troubleshooting & Repair",
-        'instructor': "Prof. Tan",
-        'page': const ComputerRepairPage(),
-      },
-    ];
+    // Determine the order for unlocking (by ID for now, or you can add an order column to tbl_course)
+    final List<int> courseOrder = _allCourses.map((c) => c.id).toList()..sort();
 
-    return courses.map((course) {
-      final int courseId = course['id'];
-      final bool enabled =
-          _service.isCourseUnlocked(courseId, _courseProgress, courseOrder);
-
-      final double progress = _getProgressNormalized(courseId);
+    return _allCourses.map((course) {
+      final bool enabled = _controller.isUnlocked(course.id, _courseProgress, courseOrder);
+      final double progress = _controller.calculateProgress(_courseProgress, course.id);
 
       return Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: ModernCourseCard(
-          title: course['title'],
-          instructor: course['instructor'],
+          title: course.title,
+          instructor: course.instructor,
           progress: progress,
           enabled: enabled,
           onTap: () {
             if (enabled) {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => course['page']),
-              );
+                MaterialPageRoute(
+                  builder: (_) => CourseDetailsPage(courseId: course.id),
+                ),
+              ).then((_) => _loadData()); // Refresh on return to update progress
             }
           },
         ),
@@ -211,7 +205,7 @@ class ModernCourseCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: enabled ? theme.cardTheme.color : theme.disabledColor.withOpacity(0.1),
+          color: enabled ? (isDark ? const Color(0xFF1B263B) : theme.cardColor) : theme.disabledColor.withAlpha(26),
           borderRadius: BorderRadius.circular(18),
           boxShadow: (enabled && !isDark)
               ? const [
@@ -236,6 +230,7 @@ class ModernCourseCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
+                      fontFamily: 'Poppins',
                       color: enabled ? theme.textTheme.bodyLarge?.color : theme.disabledColor,
                     ),
                   ),
@@ -254,7 +249,8 @@ class ModernCourseCard extends StatelessWidget {
               "Instructor: $instructor",
               style: TextStyle(
                 fontSize: 13,
-                color: enabled ? theme.textTheme.bodyMedium?.color?.withOpacity(0.7) : theme.disabledColor,
+                fontFamily: 'Poppins',
+                color: enabled ? theme.textTheme.bodyMedium?.color?.withAlpha(179) : theme.disabledColor,
               ),
             ),
 
@@ -266,12 +262,17 @@ class ModernCourseCard extends StatelessWidget {
               children: [
                 Text(
                   "Progress",
-                  style: TextStyle(fontSize: 13, color: theme.textTheme.bodyMedium?.color),
+                  style: TextStyle(
+                    fontSize: 13, 
+                    fontFamily: 'Poppins',
+                    color: theme.textTheme.bodyMedium?.color,
+                  ),
                 ),
                 Text(
                   "${(progress * 100).toInt()}%",
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins',
                     color: primaryColor,
                   ),
                 ),
@@ -285,7 +286,7 @@ class ModernCourseCard extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 8,
-                backgroundColor: primaryColor.withOpacity(0.1),
+                backgroundColor: primaryColor.withAlpha(26),
                 color: enabled ? primaryColor : theme.disabledColor,
               ),
             ),
@@ -307,7 +308,12 @@ class ModernCourseCard extends StatelessWidget {
                   enabled
                       ? (progress == 0 ? "Start Course" : "Continue Course")
                       : "Locked",
-                  style: const TextStyle(fontSize: 14, color: Colors.white),
+                  style: const TextStyle(
+                    fontSize: 14, 
+                    color: Colors.white,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),

@@ -5,62 +5,87 @@ import '../../connection/db_connect.dart';
 class OtpService {
   final SupabaseClient _supabase = supabase;
 
-  /// Sends a Magic Link (OTP) to the new email address to verify ownership.
-  Future<void> sendEmailChangeOtp(String email) async {
+  /// Sends a direct 6-digit OTP code to the email for ownership verification.
+  Future<void> sendDirectOtp(String email) async {
     try {
-      debugPrint("OTP_DEBUG: Sending Magic Link OTP to: $email");
+      debugPrint("OTP_DEBUG: Sending direct OTP to: $email");
       await _supabase.auth.signInWithOtp(
         email: email,
-        shouldCreateUser: true, // Required for new emails in Supabase Auth
+        shouldCreateUser: false,
       );
-      debugPrint("OTP_DEBUG: Magic Link OTP sent successfully.");
-    } on AuthException catch (e) {
-      debugPrint("OTP_DEBUG AuthException: ${e.message}");
-      rethrow;
     } catch (e) {
-      debugPrint("OTP_DEBUG Unexpected error: $e");
-      throw Exception('Failed to send verification code: $e');
+      debugPrint("OTP_DEBUG Error sending direct OTP: $e");
+      rethrow;
     }
   }
 
-  /// Verifies the Magic Link OTP code silently (without logging out current user).
-  Future<void> verifyEmailChangeOtp(String email, String token) async {
+  /// Sends a Magic Link (Verification Link) for new emails.
+  Future<void> sendVerificationLink(String email) async {
     try {
-      debugPrint("OTP_DEBUG: Verifying Magic Link OTP for: $email (Silent)");
-      
-      // Separate client instance to prevent session hijacking/logout
-      final tempClient = SupabaseClient(
-        supabaseUrl,
-        supabaseAnonKey,
-      );
-
-      await tempClient.auth.verifyOTP(
-        type: OtpType.magiclink, // Must match signInWithOtp
-        token: token,
+      debugPrint("OTP_DEBUG: Sending verification link to: $email");
+      await _supabase.auth.signInWithOtp(
         email: email,
+        shouldCreateUser: true,
+        emailRedirectTo: 'io.supabase.elearning://signup-callback/',
       );
-      
-      debugPrint("OTP_DEBUG: Silent verification successful.");
-    } on AuthException catch (e) {
-      debugPrint("OTP_DEBUG AuthException: ${e.message}");
-      rethrow;
     } catch (e) {
-      debugPrint("OTP_DEBUG Unexpected error: $e");
-      throw Exception('Invalid or expired OTP');
+      debugPrint("OTP_DEBUG Error sending link: $e");
+      rethrow;
     }
   }
 
-  /// Updates the user status in tbl_user to Active (1)
-  Future<void> updateUserStatusToActive(String authId) async {
+  /// Sends the password reset OTP to the user's CURRENT email.
+  Future<void> sendPasswordResetOtp(String currentEmail) async {
     try {
-      debugPrint("OTP_DEBUG: Updating status for auth_id: $authId to 1");
-      await _supabase
-          .from('tbl_user')
-          .update({'status_no': 1})
-          .eq('auth_id', authId);
-      debugPrint("OTP_DEBUG: Status updated successfully.");
+      await _supabase.auth.resetPasswordForEmail(currentEmail);
     } catch (e) {
-      debugPrint("OTP_DEBUG Error updating status: $e");
+      rethrow;
+    }
+  }
+
+  /// Finalizes the email and/or password change via Edge Function.
+  /// It verifies the new email ownership first if a new email is provided.
+  Future<void> verifyAndApplyAccountChanges({
+    String? newEmail, 
+    String? emailToken,
+    String? newPassword,
+    required String targetAuthId,
+    bool isFromLink = false,
+  }) async {
+    try {
+      String? tempAuthId;
+
+      // 1. If changing email, verify the new email ownership OTP/Link first
+      if (newEmail != null && emailToken != null) {
+        debugPrint("OTP_DEBUG: Verifying New Email OTP...");
+        final tempClient = SupabaseClient(supabaseUrl, supabaseAnonKey);
+        final verifyRes = await tempClient.auth.verifyOTP(
+          type: OtpType.magiclink,
+          token: emailToken,
+          email: newEmail,
+        );
+        tempAuthId = verifyRes.user?.id;
+      }
+      
+      debugPrint("OTP_DEBUG: Calling admin_update_user...");
+
+      // 2. Call the Edge Function to apply changes (email, password, or both)
+      final response = await _supabase.functions.invoke(
+        'admin_update_user',
+        body: {
+          'auth_id': targetAuthId,
+          'new_email': newEmail,
+          'new_password': newPassword,
+          'temp_auth_id': isFromLink ? tempAuthId : null,
+          'action': 'update_account'
+        },
+      );
+
+      if (response.status != 200) {
+        throw response.data['error'] ?? 'Server update failed';
+      }
+    } catch (e) {
+      rethrow;
     }
   }
 }

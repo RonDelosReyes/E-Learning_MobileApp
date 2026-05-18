@@ -18,8 +18,11 @@ class ResourceModel {
   });
 
   factory ResourceModel.fromMap(Map<String, dynamic> map) {
-    final user = map['tbl_user'];
-    final uploader = user != null ? "${user['firstName']} ${user['lastName']}" : "Unknown";
+    String uploader = "Unknown";
+    final admin = map['tbl_admin'];
+    if (admin != null && admin['tbl_user'] != null) {
+      uploader = "${admin['tbl_user']['firstName']} ${admin['tbl_user']['lastName']}";
+    }
     
     return ResourceModel(
       id: map['resource_id'],
@@ -28,7 +31,9 @@ class ResourceModel {
       category: map['tbl_category']?['category'] ?? "General",
       fileUrl: map['file_url'],
       uploaderName: uploader,
-      dateUploaded: DateTime.parse(map['date_uploaded']),
+      dateUploaded: map['date_uploaded'] != null 
+          ? DateTime.parse(map['date_uploaded']) 
+          : DateTime.now(),
     );
   }
 }

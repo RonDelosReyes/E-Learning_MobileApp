@@ -1,32 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../back_end/providers/user_provider.dart';
-import '../../../back_end/utils/empty_text_validator.dart';
-import '../../../back_end/controllers/profile/edit_user_controller.dart';
-import '../../../models/profile/edit_user_model.dart';
-import '../dialog/cancel_dialog.dart';
+import 'package:e_learning_app/back_end/providers/user_provider.dart';
+import 'package:e_learning_app/back_end/utils/empty_text_validator.dart';
+import 'package:e_learning_app/back_end/controllers/profile/edit_user_controller.dart';
+import 'package:e_learning_app/models/profile/edit_user_model.dart';
+import 'package:e_learning_app/front_end/widgets/dialog/cancel_dialog.dart';
 
 class EditUserModal {
   static Future<void> show(BuildContext context, UserProvider user) async {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final bool isFaculty = user.role == 'Faculty';
     final editUserController = EditUserController();
 
     // -------------------- Controllers --------------------
     final firstNameCtrl = TextEditingController(text: user.firstName ?? "");
-    final middleInitialCtrl = TextEditingController(text: user.middleInitial ?? "");
+    final middleNameCtrl = TextEditingController(text: user.middleName ?? "");
     final lastNameCtrl = TextEditingController(text: user.lastName ?? "");
-    final contactCtrl = TextEditingController(text: user.contactNo ?? "");
     
     // Student specific
-    final studentNumberCtrl = TextEditingController(text: user.studentNumber ?? "");
-    final yearLevelCtrl = TextEditingController(text: user.yearLevel ?? "");
-    final yearOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
-
-    // Faculty specific
-    final deptCtrl = TextEditingController(text: user.department ?? "");
-    final specCtrl = TextEditingController(text: user.specialization ?? "");
+    final studentNumberCtrl = TextEditingController(text: user.studentNo ?? "");
+    // Display programName instead of ID
+    final programNameCtrl = TextEditingController(text: user.programName ?? "N/A");
 
     bool isLoading = false;
 
@@ -34,32 +28,20 @@ class EditUserModal {
     String? firstNameError;
     String? lastNameError;
     String? studentNumError;
-    String? yearLevelError;
-    String? contactError;
-    String? deptError;
-    String? specError;
 
     // -------------------- Snapshot for unsaved changes --------------------
     final initialValues = {
       "firstName": firstNameCtrl.text,
-      "middleInitial": middleInitialCtrl.text,
+      "middleName": middleNameCtrl.text,
       "lastName": lastNameCtrl.text,
-      "contact": contactCtrl.text,
-      "studentNumber": studentNumberCtrl.text,
-      "yearLevel": yearLevelCtrl.text,
-      "dept": deptCtrl.text,
-      "spec": specCtrl.text,
+      "studentNo": studentNumberCtrl.text,
     };
 
     bool hasUnsavedChanges() {
       return firstNameCtrl.text != initialValues["firstName"] ||
-          middleInitialCtrl.text != initialValues["middleInitial"] ||
+          middleNameCtrl.text != initialValues["middleName"] ||
           lastNameCtrl.text != initialValues["lastName"] ||
-          contactCtrl.text != initialValues["contact"] ||
-          studentNumberCtrl.text != initialValues["studentNumber"] ||
-          yearLevelCtrl.text != initialValues["yearLevel"] ||
-          deptCtrl.text != initialValues["dept"] ||
-          specCtrl.text != initialValues["spec"];
+          studentNumberCtrl.text != initialValues["studentNo"];
     }
 
     await showModalBottomSheet(
@@ -117,21 +99,15 @@ class EditUserModal {
                     const SizedBox(height: 24),
                     
                     _styledInput(context, "First Name", firstNameCtrl, errorText: firstNameError, lettersOnly: true),
-                    _styledInput(context, "Middle Initial", middleInitialCtrl, lettersOnly: true, maxLength: 1),
+                    _styledInput(context, "Middle Name", middleNameCtrl, lettersOnly: true),
                     _styledInput(context, "Last Name", lastNameCtrl, errorText: lastNameError, lettersOnly: true),
                     
-                    if (!isFaculty) ...[
-                      _styledInput(context, "Student Number", studentNumberCtrl, 
-                          errorText: studentNumError,
-                          inputFormatter: FilteringTextInputFormatter.allow(RegExp(r'^\d*-?\d*$'))),
-                      _styledDropdown(context, "Year Level", yearLevelCtrl, yearOptions, errorText: yearLevelError),
-                    ],
-
-                    if (isFaculty) ...[
-                      _styledInput(context, "Contact No", contactCtrl, errorText: contactError, digitsOnly: true, maxLength: 11),
-                      _styledInput(context, "Department", deptCtrl, errorText: deptError),
-                      _styledInput(context, "Specialization", specCtrl, errorText: specError),
-                    ],
+                    _styledInput(context, "Student Number", studentNumberCtrl, 
+                        errorText: studentNumError,
+                        inputFormatter: FilteringTextInputFormatter.allow(RegExp(r'^\d*-?\d*$'))),
+                    
+                    // Program field: Disabled and displaying the name
+                    _styledInput(context, "Program", programNameCtrl, enabled: false),
                     
                     const SizedBox(height: 32),
 
@@ -176,27 +152,11 @@ class EditUserModal {
                               setState(() {
                                 firstNameError = EmptyTextValidator.validate(firstNameCtrl.text, "First Name");
                                 lastNameError = EmptyTextValidator.validate(lastNameCtrl.text, "Last Name");
-                                
-                                if (!isFaculty) {
-                                  studentNumError = EmptyTextValidator.validate(studentNumberCtrl.text, "Student Number");
-                                  yearLevelError = EmptyTextValidator.validate(yearLevelCtrl.text, "Year Level");
-                                } else {
-                                  contactError = EmptyTextValidator.validate(contactCtrl.text, "Contact Number");
-                                  deptError = EmptyTextValidator.validate(deptCtrl.text, "Department");
-                                  specError = EmptyTextValidator.validate(specCtrl.text, "Specialization");
-                                }
+                                studentNumError = EmptyTextValidator.validate(studentNumberCtrl.text, "Student Number");
                               });
 
                               // Check if any error exists from empty validator
-                              if (firstNameError != null || lastNameError != null ||
-                                  (!isFaculty && (studentNumError != null || yearLevelError != null)) ||
-                                  (isFaculty && (contactError != null || deptError != null || specError != null))) {
-                                return;
-                              }
-
-                              // Additional Validations
-                              if (isFaculty && contactCtrl.text.length != 11) {
-                                setState(() => contactError = "Contact Number must be 11 digits");
+                              if (firstNameError != null || lastNameError != null || studentNumError != null) {
                                 return;
                               }
 
@@ -206,21 +166,16 @@ class EditUserModal {
                                 final model = EditUserModel(
                                   userId: user.userId!,
                                   firstName: firstNameCtrl.text.trim(),
-                                  middleInitial: middleInitialCtrl.text.trim(),
                                   lastName: lastNameCtrl.text.trim(),
-                                  contactNo: contactCtrl.text.trim(),
-                                  role: user.role!,
+                                  middleName: middleNameCtrl.text.trim(),
+                                  role: "Student",
                                   studentId: user.studentId,
                                   studentNum: studentNumberCtrl.text.trim(),
-                                  yearLevel: yearLevelCtrl.text.trim(),
-                                  facultyId: user.facultyId,
-                                  department: deptCtrl.text.trim(),
-                                  specialization: specCtrl.text.trim(),
+                                  programId: user.programId, // Preserve existing program ID
                                 );
 
                                 await editUserController.updateProfile(model);
-                                await user.fetchUserById(user.userId!); // Refresh provider
-
+                                
                                 if (context.mounted) Navigator.pop(context);
                               } catch (e) {
                                 if (context.mounted) {
@@ -250,7 +205,7 @@ class EditUserModal {
   }
 
   static Widget _styledInput(BuildContext context, String label, TextEditingController ctrl,
-      {String? errorText, bool lettersOnly = false, bool digitsOnly = false, int? maxLength, TextInputFormatter? inputFormatter}) {
+      {String? errorText, bool lettersOnly = false, bool digitsOnly = false, int? maxLength, TextInputFormatter? inputFormatter, bool enabled = true}) {
     final theme = Theme.of(context);
     List<TextInputFormatter> formatters = [];
     if (lettersOnly) formatters.add(FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')));
@@ -262,15 +217,20 @@ class EditUserModal {
       padding: const EdgeInsets.only(bottom: 16),
       child: TextField(
         controller: ctrl,
+        enabled: enabled,
         inputFormatters: formatters,
-        style: TextStyle(color: theme.textTheme.bodyMedium?.color),
+        style: TextStyle(color: enabled ? theme.textTheme.bodyMedium?.color : theme.textTheme.bodyMedium?.color?.withOpacity(0.5)),
         decoration: InputDecoration(
           labelText: label,
           errorText: errorText,
           labelStyle: TextStyle(color: theme.colorScheme.primary.withValues(alpha: 0.8), fontSize: 13),
           filled: true,
-          fillColor: theme.cardTheme.color?.withValues(alpha: 0.5),
+          fillColor: enabled ? theme.cardTheme.color?.withValues(alpha: 0.5) : theme.cardTheme.color?.withValues(alpha: 0.2),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.05)),
+          ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
@@ -288,44 +248,6 @@ class EditUserModal {
             borderSide: const BorderSide(color: Colors.red, width: 1.5),
           ),
         ),
-      ),
-    );
-  }
-
-  static Widget _styledDropdown(BuildContext context, String label, TextEditingController ctrl, List<String> options, {String? errorText}) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: DropdownButtonFormField<String>(
-        value: ctrl.text.isNotEmpty ? ctrl.text : null,
-        style: TextStyle(color: theme.textTheme.bodyMedium?.color),
-        dropdownColor: theme.cardTheme.color,
-        decoration: InputDecoration(
-          labelText: label,
-          errorText: errorText,
-          labelStyle: TextStyle(color: theme.colorScheme.primary.withValues(alpha: 0.8), fontSize: 13),
-          filled: true,
-          fillColor: theme.cardTheme.color?.withValues(alpha: 0.5),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.red, width: 1),
-          ),
-          focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.red, width: 1.5),
-          ),
-        ),
-        items: options.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))).toList(),
-        onChanged: (val) => ctrl.text = val ?? '',
       ),
     );
   }

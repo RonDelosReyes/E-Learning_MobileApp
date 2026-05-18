@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../back_end/services/profile/edit_user_service.dart';
-import '../widgets/profile/edit_user_modal.dart';
-import '../widgets/profile/profile_avatar_uploader.dart';
-import '../widgets/profile/request_email_modal.dart';
-import '../../back_end/providers/user_provider.dart';
-import '../widgets/dialog/logout_dialog.dart';
-import '../widgets/modal_appBar.dart';
-import '../login/login_page.dart';
+import 'package:e_learning_app/back_end/providers/user_provider.dart';
+import 'package:e_learning_app/front_end/widgets/profile/edit_user_modal.dart';
+import 'package:e_learning_app/front_end/widgets/profile/profile_avatar_uploader.dart';
+import 'package:e_learning_app/front_end/widgets/profile/request_email_modal.dart';
+import 'package:e_learning_app/front_end/widgets/dialog/logout_dialog.dart';
+import 'package:e_learning_app/front_end/widgets/modal_appBar.dart';
+import 'package:e_learning_app/front_end/login/login_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -60,12 +59,12 @@ class _ProfilePageState extends State<ProfilePage> {
             Container(
               width: 40,
               height: 4,
-              margin: const EdgeInsets.only(bottom: 24),
               decoration: BoxDecoration(
                 color: theme.dividerColor.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+            const SizedBox(height: 24),
             const Text(
               "Profile Options",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Poppins'),
@@ -145,18 +144,22 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Consumer<UserProvider>(
       builder: (context, user, child) {
-        final bool isFaculty = user.role == 'Faculty';
-        
+        // Build separated name list
+        final nameParts = [
+          _InfoItem(Icons.person_outline, "First Name", user.firstName ?? "N/A"),
+          _InfoItem(Icons.badge_outlined, "Middle Initial", user.middleInitial.isNotEmpty ? user.middleInitial : "N/A"),
+          _InfoItem(Icons.person_outline, "Last Name", user.lastName ?? "N/A"),
+        ];
+
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
-          appBar: ModalAppBar(
-            title: isFaculty ? 'Faculty Profile' : 'Student Profile',
+          appBar: const ModalAppBar(
+            title: 'Student Profile',
             useGradient: true,
           ),
           body: SingleChildScrollView(
             child: Column(
               children: [
-                // ===== Profile Header Extension =====
                 Stack(
                   clipBehavior: Clip.none,
                   alignment: Alignment.center,
@@ -200,9 +203,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 Text(
                   user.fullName,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.headlineSmall?.copyWith(
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                     fontFamily: 'Poppins',
+                    fontSize: 20,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -213,7 +217,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    user.role?.toUpperCase() ?? (isFaculty ? "FACULTY" : "STUDENT"),
+                    "STUDENT",
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
@@ -233,9 +237,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         context,
                         "PERSONAL DETAILS",
                         [
-                          _InfoItem(Icons.person_outline, "Full Name", user.fullName),
+                          ...nameParts,
                           _InfoItem(Icons.email_outlined, "Email", user.email ?? "N/A"),
-                          _InfoItem(Icons.phone_outlined, "Contact", user.contactNo ?? "N/A"),
                         ],
                       ),
 
@@ -243,16 +246,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
                       _buildInfoGroup(
                         context,
-                        isFaculty ? "PROFESSIONAL INFO" : "ACADEMIC INFO",
-                        isFaculty
-                            ? [
-                                _InfoItem(Icons.business_outlined, "Department", user.department ?? "N/A"),
-                                _InfoItem(Icons.workspace_premium_outlined, "Specialization", user.specialization ?? "N/A"),
-                              ]
-                            : [
-                                _InfoItem(Icons.badge_outlined, "ID Number", user.studentNumber ?? "N/A"),
-                                _InfoItem(Icons.school_outlined, "Year Level", user.yearLevel ?? "N/A"),
-                              ],
+                        "ACADEMIC INFO",
+                        [
+                          _InfoItem(Icons.badge_outlined, "Student Number", user.studentNo ?? "N/A"),
+                          _InfoItem(Icons.school_outlined, "Program", user.programName ?? "N/A"),
+                        ],
                       ),
 
                       const SizedBox(height: 16),

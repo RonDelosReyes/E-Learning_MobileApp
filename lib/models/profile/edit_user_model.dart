@@ -2,32 +2,22 @@ class EditUserModel {
   final int userId;
   final String firstName;
   final String lastName;
-  final String? middleInitial;
-  final String contactNo;
+  final String? middleName;
   final String role;
 
   // Student specific
   final int? studentId;
   final String? studentNum;
-  final String? yearLevel;
-
-  // Faculty specific
-  final int? facultyId;
-  final String? department;
-  final String? specialization;
+  final int? programId;
 
   EditUserModel({
     required this.userId,
     required this.firstName,
     required this.lastName,
-    this.middleInitial,
-    required this.contactNo,
+    this.middleName,
     required this.role,
     this.studentId,
     this.studentNum,
-    this.yearLevel,
-    this.facultyId,
-    this.department,
-    this.specialization,
+    this.programId,
   });
 }

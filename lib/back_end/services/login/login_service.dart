@@ -9,7 +9,7 @@ class AuthService {
     required String password,
   }) async {
     try {
-      // Use Supabase Auth for login
+      debugPrint("DEBUG: [AuthService] Attempting login for: $email");
       final AuthResponse res = await supabase.auth.signInWithPassword(
         email: email.trim(),
         password: password,
@@ -18,44 +18,63 @@ class AuthService {
       final user = res.user;
       if (user == null) return null;
 
-      // Fetch user profile data from public.tbl_user joined with roles and profile
-      final userData = await supabase
+      debugPrint("DEBUG: [AuthService] Auth successful. User ID: ${user.id}");
+
+      // Explicitly check for tbl_student relationship
+      final response = await supabase
           .from('tbl_user')
           .select('''
             *,
-            tbl_faculty (*),
-            tbl_student (*),
-            tbl_profile (filePath)
+            tbl_student!tbl_student_user_id_fkey (
+              *,
+              tbl_program!tbl_student_program_id_fkey (
+                program_name
+              )
+            )
           ''')
           .eq('auth_id', user.id)
           .maybeSingle();
 
-      if (userData == null) {
-        debugPrint("User profile not found in tbl_user for auth_id: ${user.id}");
+      if (response == null) {
+        debugPrint("DEBUG: [AuthService] Record not found in tbl_user for auth_id: ${user.id}");
+        await supabase.auth.signOut();
         throw 'User profile not found.';
       }
 
-      // Add email from Auth
-      userData['email'] = user.email;
+      final userData = Map<String, dynamic>.from(response);
 
-      return userData;
-    } on AuthException catch (error) {
-      debugPrint("Login Auth Error: ${error.message}");
-      
-      String userMessage = "Invalid email or password.";
-      if (error.message.toLowerCase().contains("email not confirmed")) {
-        userMessage = "Please confirm your email before logging in.";
+      // MANDATORY STUDENT CHECK:
+      // If the account exists in tbl_user but NOT in tbl_student, deny login.
+      final studentData = userData['tbl_student'];
+      final bool hasStudentProfile = studentData != null && 
+          (studentData is Map || (studentData is List && studentData.isNotEmpty));
+
+      if (!hasStudentProfile) {
+        debugPrint("DEBUG: [AuthService] User found but NO record in tbl_student. Denying access.");
+        await supabase.auth.signOut();
+        throw 'Access denied. Only student accounts are permitted.';
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(userMessage)),
-      );
+      // Check account status (e.g., 3 = Pending)
+      // If the user is pending, but successfully logged in, it means they've verified their account.
+      if (userData['status_no'] == 3) {
+        debugPrint("DEBUG: [AuthService] Account is pending. Activating now...");
+        await supabase
+            .from('tbl_user')
+            .update({'status_no': 1})
+            .eq('auth_id', user.id);
+        
+        userData['status_no'] = 1; // Update local map for current session
+      }
+
+      userData['email'] = user.email;
+      return userData;
+    } on AuthException catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
       return null;
     } catch (e) {
-      debugPrint("Unexpected Login Error: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Something went wrong. Please try again later.")),
-      );
+      debugPrint("DEBUG: [AuthService] Unexpected Error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
       return null;
     }
   }
@@ -64,17 +83,21 @@ class AuthService {
     await supabase.auth.signOut();
   }
 
-  /// Updates the user's email in Supabase Auth.
-  /// This will send confirmation emails to both old and new addresses.
-  Future<void> updateUserEmail(String newEmail) async {
+  Future<bool> doesEmailExist(String email) async {
     try {
-      await supabase.auth.updateUser(
-        UserAttributes(email: newEmail.trim()),
-      );
-    } on AuthException {
-      rethrow;
-    } catch (e) {
-      throw 'An unexpected error occurred while updating email.';
-    }
+      return await supabase.rpc('check_email_exists', params: {'email_to_check': email.trim().toLowerCase()});
+    } catch (e) { return false; }
+  }
+
+  Future<void> sendPasswordResetOTP(String email) async {
+    await supabase.auth.resetPasswordForEmail(email.trim());
+  }
+
+  Future<void> verifyResetOTP(String email, String token) async {
+    await supabase.auth.verifyOTP(email: email.trim(), token: token.trim(), type: OtpType.recovery);
+  }
+
+  Future<void> updatePassword(String newPassword) async {
+    await supabase.auth.updateUser(UserAttributes(password: newPassword.trim()));
   }
 }

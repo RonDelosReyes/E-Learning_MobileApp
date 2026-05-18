@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class AppColors {
-  // Light Mode Blues (Lighter Gradient)
-  static const primaryLight = Color(0xFF42A5F5); // Blue 400
-  static const secondaryLight = Color(0xFF1E88E5); // Blue 600
+  // Light Mode Blues (Vibrant & Obvious Gradient)
+  static const primaryLight = Color(0xFF1565C0); // Blue 800
+  static const secondaryLight = Color(0xFF42A5F5); // Blue 400
   
-  // Dark Mode Blues (Darker Gradient)
-  static const primaryDark = Color(0xFF1565C0); // Blue 800
-  static const secondaryDark = Color(0xFF0D47A1); // Blue 900
+  // Dark Mode Blues (Balanced Mid-Tone Blue Gradient)
+  static const primaryDark = Color(0xFF1E88E5); // Blue 600
+  static const secondaryDark = Color(0xFF42A5F5); // Blue 400
 
   static const darkBackground = Color(0xFF0F172A);
   static const lightBackground = Color(0xFFF5F6FA);
@@ -37,10 +37,66 @@ class AppColors {
   static const actionBlue = Color(0xFF1565C0); 
 }
 
+class AppGradient extends ThemeExtension<AppGradient> {
+  final LinearGradient primary;
+  final Color loginTitle;
+  final Color loginLink;
+
+  const AppGradient({
+    required this.primary,
+    required this.loginTitle,
+    required this.loginLink,
+  });
+
+  @override
+  ThemeExtension<AppGradient> copyWith({
+    LinearGradient? primary,
+    Color? loginTitle,
+    Color? loginLink,
+  }) {
+    return AppGradient(
+      primary: primary ?? this.primary,
+      loginTitle: loginTitle ?? this.loginTitle,
+      loginLink: loginLink ?? this.loginLink,
+    );
+  }
+
+  @override
+  ThemeExtension<AppGradient> lerp(ThemeExtension<AppGradient>? other, double t) {
+    if (other is! AppGradient) return this;
+    return AppGradient(
+      primary: LinearGradient.lerp(primary, other.primary, t)!,
+      loginTitle: Color.lerp(loginTitle, other.loginTitle, t)!,
+      loginLink: Color.lerp(loginLink, other.loginLink, t)!,
+    );
+  }
+}
+
 class AppTheme {
+  static AppGradient get lightGradient => const AppGradient(
+        primary: LinearGradient(
+          colors: [AppColors.primaryLight, AppColors.secondaryLight],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        loginTitle: AppColors.loginTitleBlue,
+        loginLink: AppColors.loginLinkBlue,
+      );
+
+  static AppGradient get darkGradient => const AppGradient(
+        primary: LinearGradient(
+          colors: [AppColors.primaryDark, AppColors.secondaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        loginTitle: AppColors.loginTitleDark,
+        loginLink: AppColors.loginLinkDark,
+      );
+
   static ThemeData lightTheme = ThemeData(
     brightness: Brightness.light,
     useMaterial3: true,
+    extensions: [lightGradient],
     scaffoldBackgroundColor: AppColors.lightBackground,
     cardColor: AppColors.lightSurface,
     cardTheme: CardThemeData(
@@ -79,6 +135,7 @@ class AppTheme {
   static ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
     useMaterial3: true,
+    extensions: [darkGradient],
     scaffoldBackgroundColor: AppColors.darkBackground,
     cardColor: AppColors.darkSurface,
     cardTheme: CardThemeData(

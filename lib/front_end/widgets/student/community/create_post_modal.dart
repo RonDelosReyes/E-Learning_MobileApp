@@ -7,6 +7,7 @@ import '../../../../back_end/providers/user_provider.dart';
 import '../../../../back_end/utils/post_storage_service.dart';
 import '../../../../models/student/community_hub/community_model.dart';
 import '../../../../back_end/utils/debug_logger.dart';
+import '../../primary_button.dart';
 
 class CreatePostModal extends StatefulWidget {
   final VoidCallback onSuccess;
@@ -37,6 +38,7 @@ class _CreatePostModalState extends State<CreatePostModal> {
   int? _selectedCategoryId;
   bool _isLoadingCategories = true;
   bool _isSubmitting = false;
+  String? _titleError;
 
   @override
   void initState() {
@@ -207,6 +209,7 @@ class _CreatePostModalState extends State<CreatePostModal> {
                     style: const TextStyle(fontFamily: 'Poppins'),
                     decoration: InputDecoration(
                       hintText: "Enter an eye-catching title",
+                      errorText: _titleError,
                       filled: true,
                       fillColor: theme.cardColor,
                       border: OutlineInputBorder(
@@ -218,6 +221,11 @@ class _CreatePostModalState extends State<CreatePostModal> {
                         borderSide: BorderSide(color: theme.dividerColor.withOpacity(0.2)),
                       ),
                     ),
+                    onChanged: (val) {
+                      if (_titleError != null && val.trim().isNotEmpty) {
+                        setState(() => _titleError = null);
+                      }
+                    },
                   ),
 
                   const SizedBox(height: 24),
@@ -309,28 +317,10 @@ class _CreatePostModalState extends State<CreatePostModal> {
           // Action Button
           Padding(
             padding: const EdgeInsets.all(24),
-            child: SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _handleSubmit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 0,
-                ),
-                child: _isSubmitting
-                    ? const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : const Text(
-                        "Post to Community",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Poppins'),
-                      ),
-              ),
+            child: PrimaryButton(
+              text: "Post to Community",
+              isLoading: _isSubmitting,
+              onPressed: _handleSubmit,
             ),
           ),
         ],
@@ -342,12 +332,18 @@ class _CreatePostModalState extends State<CreatePostModal> {
     final title = _titleController.text.trim();
     final content = _contentController.text.trim();
 
-    await DebugLogger.log('CREATE_POST: Submitting post. Title: $title, CategoryId: $_selectedCategoryId');
+    setState(() {
+      _titleError = title.isEmpty ? "Title is required" : null;
+    });
 
-    if (title.isEmpty || content.isEmpty || _selectedCategoryId == null) {
-      await DebugLogger.log('CREATE_POST: Validation failed. Some fields are empty.');
+    if (_titleError != null) {
+      await DebugLogger.log('CREATE_POST: Validation failed. Title is empty.');
+      return;
+    }
+
+    if (_selectedCategoryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in all fields")),
+        const SnackBar(content: Text("Please select a category")),
       );
       return;
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
 
 class PrimaryAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
@@ -8,13 +9,20 @@ class PrimaryAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
     final onPrimary = theme.colorScheme.onPrimary;
+    final gradient = theme.extension<AppGradient>()?.primary;
 
     return AppBar(
       centerTitle: true,
       elevation: 0,
-      backgroundColor: primaryColor,
+      backgroundColor: gradient != null ? Colors.transparent : theme.colorScheme.primary,
+      flexibleSpace: gradient != null
+          ? Container(
+              decoration: BoxDecoration(
+                gradient: gradient,
+              ),
+            )
+          : null,
       iconTheme: IconThemeData(
         color: onPrimary,
         size: 28,

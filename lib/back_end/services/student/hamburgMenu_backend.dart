@@ -95,7 +95,7 @@ class AppDrawerBackend {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? primaryBlue.withOpacity(0.08) : Colors.transparent,
+          color: isSelected ? primaryBlue.withValues(alpha: 0.08) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -154,13 +154,25 @@ class AppDrawerBackend {
       title: 'AR Lab',
       icon: Icons.view_in_ar_outlined,
       route: 'arlab',
-      onTap: () => CustomAlertDialog().show(context),
+      onTap: () {
+        CustomAlertDialog.show(
+          context: context,
+          title: 'Page not Available',
+          message: 'That Page was Not Available at the Moment.',
+        );
+      },
     ),
     DrawerMenuItem(
       title: 'Community Hub',
       icon: Icons.groups_outlined,
       route: 'community',
-      onTap: () => CustomAlertDialog().show(context),
+      onTap: () {
+        CustomAlertDialog.show(
+          context: context,
+          title: 'Page not Available',
+          message: 'That Page was Not Available at the Moment.',
+        );
+      },
     ),
     DrawerMenuItem(
       title: 'Log Out',
