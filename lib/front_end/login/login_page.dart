@@ -144,7 +144,7 @@ class _LogInFormState extends State<LogInForm> {
                                 ],
                               ),
                               child: Image.asset(
-                                'assets/cstalogo.png',
+                                'lib/assets/image/logo_ar.png',
                                 width: 85 * scale,
                                 height: 85 * scale,
                                 fit: BoxFit.contain,

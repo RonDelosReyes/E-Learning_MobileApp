@@ -5,9 +5,12 @@ import 'package:e_learning_app/models/student/tech_library/resource_model.dart';
 import 'package:e_learning_app/front_end/widgets/hamburgMenu.dart';
 import 'package:e_learning_app/front_end/widgets/pdf_viewer_page.dart';
 import 'package:e_learning_app/front_end/widgets/media_viewer_page.dart';
+import '../../widgets/skeleton_widgets.dart';
+import '../../widgets/empty_state_widget.dart';
 
 class TechLibraryPage extends StatefulWidget {
-  const TechLibraryPage({super.key});
+  final bool isInsideShell;
+  const TechLibraryPage({super.key, this.isInsideShell = false});
 
   @override
   State<TechLibraryPage> createState() => _TechLibraryPageState();
@@ -58,6 +61,124 @@ class _TechLibraryPageState extends State<TechLibraryPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
+    final onPrimary = theme.colorScheme.onPrimary;
+
+    Widget content = Column(
+      children: [
+        // Banner Header
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+          decoration: BoxDecoration(
+            color: primaryColor,
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      "Learning Resources 📚",
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Poppins'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Access modules, references, and study materials.",
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12, fontFamily: 'Poppins'),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // ===== CATEGORY FILTER =====
+        SizedBox(
+          height: 45,
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: _types.length + 1,
+            itemBuilder: (context, index) {
+              final isAll = index == 0;
+              final type = isAll ? null : _types[index - 1];
+              final isSelected = isAll ? _selectedTypeId == null : _selectedTypeId == type?.id;
+              final label = isAll ? "All" : type!.type;
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: ChoiceChip(
+                  label: Text(label),
+                  selected: isSelected,
+                  showCheckmark: false,
+                  onSelected: (val) {
+                    if (val) {
+                      setState(() {
+                        _selectedTypeId = isAll ? null : type?.id;
+                      });
+                      _loadData();
+                    }
+                  },
+                  selectedColor: primaryColor,
+                  backgroundColor: theme.cardTheme.color,
+                  labelStyle: TextStyle(
+                    color: isSelected ? onPrimary : primaryColor,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Poppins',
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    side: BorderSide(color: primaryColor),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        Expanded(
+          child: RefreshIndicator(
+                  onRefresh: _loadData,
+                  color: primaryColor,
+                  child: _isLoading 
+                    ? ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: 4,
+                        itemBuilder: (context, index) => const ListTileSkeleton(),
+                      )
+                    : _resources.isEmpty
+                      ? const EmptyStateWidget(
+                          icon: Icons.inventory_2_outlined,
+                          title: "No resources yet",
+                          description: "We are currently organizing the library. Please check back later for new materials.",
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: _resources.length,
+                          itemBuilder: (context, index) {
+                            return _buildResourceCard(_resources[index], theme);
+                          },
+                        ),
+                ),
+        ),
+      ],
+    );
+
+    if (widget.isInsideShell) {
+      return content;
+    }
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -78,110 +199,7 @@ class _TechLibraryPageState extends State<TechLibraryPage> {
         ),
       ),
       drawer: const AppDrawer(currentRoute: 'techlib'),
-      body: Column(
-        children: [
-          // Banner Header
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
-            decoration: BoxDecoration(
-              color: primaryColor,
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
-            ),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Text(
-                        "Learning Resources 📚",
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Poppins'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Access modules, references, and study materials.",
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12, fontFamily: 'Poppins'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Filter Chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Row(
-              children: [
-                _buildFilterChip(context, "All", _selectedTypeId == null, () {
-                  setState(() => _selectedTypeId = null);
-                  _loadData();
-                }),
-                ..._types.map((type) => _buildFilterChip(context, type.type, _selectedTypeId == type.id, () {
-                  setState(() => _selectedTypeId = type.id);
-                  _loadData();
-                })),
-              ],
-            ),
-          ),
-
-          Expanded(
-            child: _isLoading
-                ? Center(child: CircularProgressIndicator(color: primaryColor))
-                : RefreshIndicator(
-                    onRefresh: _loadData,
-                    color: primaryColor,
-                    child: _resources.isEmpty
-                        ? const Center(child: Text("No resources found.", style: TextStyle(fontFamily: 'Poppins')))
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            itemCount: _resources.length,
-                            itemBuilder: (context, index) {
-                              return _buildResourceCard(_resources[index], theme);
-                            },
-                          ),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(BuildContext context, String label, bool isSelected, VoidCallback onTap) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
-    
-    return Padding(
-      padding: const EdgeInsets.only(right: 10),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected ? primaryColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isSelected ? Colors.transparent : Colors.grey.withValues(alpha: 0.3)),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.grey,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              fontFamily: 'Poppins',
-              fontSize: 13,
-            ),
-          ),
-        ),
-      ),
+      body: content,
     );
   }
 

@@ -12,6 +12,7 @@ class CoursesService {
           .from('tbl_course')
           .select('''
             *,
+            tbl_category(category),
             tbl_admin (
               tbl_user (firstName, lastName)
             )
@@ -20,6 +21,19 @@ class CoursesService {
       return (response as List).map((json) => CourseModel.fromMap(json)).toList();
     } catch (e) {
       debugPrint("Error fetching courses: $e");
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchCategories() async {
+    try {
+      final response = await supabase
+          .from('tbl_category')
+          .select()
+          .order('category');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint("Error fetching categories: $e");
       return [];
     }
   }
@@ -308,5 +322,70 @@ class CoursesService {
     final prevCourseId = courseOrder[currentIndex - 1];
     final prevProgress = getProgress(progressList, prevCourseId);
     return prevProgress >= 1.0;
+  }
+
+  /// Fetches recommended courses and identifies the primary focus category
+  Future<Map<String, dynamic>> fetchRecommendationData(int userId) async {
+    try {
+      // 1. Fetch student analytics to find the absolute weakest category
+      final analyticsResponse = await supabase
+          .from('tbl_student_analytics')
+          .select('*, tbl_category(category)')
+          .eq('user_no', userId);
+
+      final analytics = analyticsResponse as List;
+      if (analytics.isEmpty) return {'courses': <CourseModel>[], 'focusCategory': null, 'focusCategoryId': null};
+
+      // Sort by score percentage (weakest first)
+      final sortedAnalytics = List<Map<String, dynamic>>.from(analytics);
+      sortedAnalytics.sort((a, b) {
+        int totalA = (a['total_questions'] ?? a['total_quextions'] ?? 1) as int;
+        int totalB = (b['total_questions'] ?? b['total_quextions'] ?? 1) as int;
+        double percA = (a['first_score'] as int) / (totalA > 0 ? totalA : 1);
+        double percB = (b['first_score'] as int) / (totalB > 0 ? totalB : 1);
+        return percA.compareTo(percB);
+      });
+
+      final weakestCategoryEntry = sortedAnalytics.first;
+      final String focusCategoryName = weakestCategoryEntry['tbl_category']?['category'] ?? "General Studies";
+      final int focusCategoryId = weakestCategoryEntry['cat_id'];
+
+      // 2. Fetch completed course IDs to exclude them
+      final progressResponse = await supabase
+          .from('tbl_user_course_progress')
+          .select('course_no')
+          .eq('user_no', userId)
+          .eq('is_completed', true);
+      
+      final completedIds = (progressResponse as List).map((p) => p['course_no'] as int).toSet();
+
+      // 3. Fetch all courses and their categories
+      final allCourses = await fetchAllCourses();
+      final weakCategoryOrder = sortedAnalytics.map((a) => a['cat_id'] as int).toList();
+
+      // 4. Filter out completed and Sort remaining courses by weakness priority
+      final List<CourseModel> recommendedCourses = allCourses
+          .where((c) => !completedIds.contains(c.id))
+          .toList();
+
+      recommendedCourses.sort((a, b) {
+        int indexA = weakCategoryOrder.indexOf(a.categoryId ?? -1);
+        int indexB = weakCategoryOrder.indexOf(b.categoryId ?? -1);
+        
+        if (indexA == -1) indexA = 999;
+        if (indexB == -1) indexB = 999;
+        
+        return indexA.compareTo(indexB);
+      });
+
+      return {
+        'courses': recommendedCourses.take(3).toList(),
+        'focusCategory': focusCategoryName,
+        'focusCategoryId': focusCategoryId,
+      };
+    } catch (e) {
+      debugPrint("Error fetching recommendation data: $e");
+      return {'courses': <CourseModel>[], 'focusCategory': null, 'focusCategoryId': null};
+    }
   }
 }

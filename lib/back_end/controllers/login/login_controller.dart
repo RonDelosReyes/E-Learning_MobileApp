@@ -33,10 +33,7 @@ class LoginController {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       userProvider.setUser(userData);
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const DashBoardPage()),
-      );
+      // Manual navigation removed. AppEntry handles the view switch reactively.
     }
   }
 

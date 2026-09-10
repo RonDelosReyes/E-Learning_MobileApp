@@ -4,9 +4,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:e_learning_app/back_end/connection/db_connect.dart';
 import 'package:e_learning_app/back_end/providers/user_provider.dart';
+import 'package:e_learning_app/front_end/widgets/main_shell.dart';
+import 'package:e_learning_app/front_end/widgets/otp_modal.dart';
 import 'package:e_learning_app/front_end/login/login_page.dart';
-import 'package:e_learning_app/front_end/student_pages/dashboard/dashboard_page.dart';
-import 'package:e_learning_app/front_end/widgets/profile/otp_modal.dart';
+import 'package:e_learning_app/front_end/widgets/student/assessment/baseline_assessment_modal.dart';
 
 class AppEntry extends StatefulWidget {
   const AppEntry({super.key});
@@ -100,7 +101,10 @@ class _AppEntryState extends State<AppEntry> {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         if (userProvider.studentId != null) {
-          return const DashBoardPage();
+          if (userProvider.isFirstTimer) {
+            return const BaselineAssessmentModal();
+          }
+          return const MainShell();
         }
         return const LogInForm();
       },

@@ -48,3 +48,25 @@ app.*.map.json
 analytics_server/
 .env
 project_context/
+
+# Unity related
+unity/AR_Assembly_Disassembly/Library/
+unity/AR_Assembly_Disassembly/Temp/
+unity/AR_Assembly_Disassembly/Obj/
+unity/AR_Assembly_Disassembly/Logs/
+
+# Build output directories
+/build
+/app/build
+/.gradle
+
+# Native build / libraries
+/.cxx
+/.externalNativeBuild
+
+# Local files
+local.properties
+*.apk
+*.aab
+*.zip
+*.tar.gz

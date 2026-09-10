@@ -180,19 +180,19 @@ class CommunityService {
       final existing = await _supabase
           .from('tbl_comment_reaction')
           .select()
-          .eq('com_no', commentId)
+          .eq('comment_no', commentId)
           .eq('user_no', userNo)
           .maybeSingle();
 
       if (existing != null) {
         if (existing['reaction_type'] == reactionType) {
-          await _supabase.from('tbl_comment_reaction').delete().eq('react_id', existing['react_id']);
+          await _supabase.from('tbl_comment_reaction').delete().eq('comment_react_id', existing['comment_react_id']);
         } else {
-          await _supabase.from('tbl_comment_reaction').update({'reaction_type': reactionType}).eq('react_id', existing['react_id']);
+          await _supabase.from('tbl_comment_reaction').update({'reaction_type': reactionType}).eq('comment_react_id', existing['comment_react_id']);
         }
       } else {
         await _supabase.from('tbl_comment_reaction').insert({
-          'com_no': commentId,
+          'comment_no': commentId,
           'user_no': userNo,
           'reaction_type': reactionType,
         });

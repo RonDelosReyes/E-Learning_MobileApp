@@ -17,16 +17,23 @@ import 'package:e_learning_app/front_end/widgets/dialog/ar_compatibility_dialog.
 import 'package:e_learning_app/front_end/profile/profile_page.dart';
 import 'package:e_learning_app/front_end/login/login_page.dart';
 
+import 'package:e_learning_app/front_end/widgets/main_shell.dart';
+
 class AppDrawer extends StatelessWidget {
   final String currentRoute;
+  final bool isInsideShell;
 
-  const AppDrawer({super.key, required this.currentRoute});
+  const AppDrawer({
+    super.key, 
+    required this.currentRoute,
+    this.isInsideShell = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Consumer2<UserProvider, ThemeProvider>(
       builder: (context, userProvider, themeProvider, child) {
-        final backend = AppDrawerBackend(context, currentRoute, themeProvider);
+        final backend = AppDrawerBackend(context, currentRoute, themeProvider, isInsideShell);
 
         return Drawer(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -78,8 +85,9 @@ class AppDrawerBackend {
   final BuildContext context;
   final String currentRoute;
   final ThemeProvider themeProvider;
+  final bool isInsideShell;
 
-  AppDrawerBackend(this.context, this.currentRoute, this.themeProvider);
+  AppDrawerBackend(this.context, this.currentRoute, this.themeProvider, this.isInsideShell);
 
   /// Opens profile page as a slide-up modal
   void openProfileOverlay() {
@@ -259,15 +267,18 @@ class AppDrawerBackend {
   }
 
   /// Navigates to a page replacing current
-  void navigate(Widget page) {
+  void navigate(Widget page, String route) {
+    if (isInsideShell) {
+      final shell = MainShell.of(context);
+      if (shell != null) {
+        shell.navigateTo(route);
+        return;
+      }
+    }
+
     if (currentRoute == 'home') {
       Navigator.push(context, MaterialPageRoute(builder: (_) => page)).then((_) {
         // This runs when returning to Home from another page (like AR Lab)
-        if (context.mounted && currentRoute == 'home') {
-          // Trigger a data reload on the dashboard if we were there
-          // We can use a global event bus or just rely on the fact that 
-          // most dashboard widgets are consumers.
-        }
       });
     } else {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
@@ -279,10 +290,10 @@ class AppDrawerBackend {
     final bool isArSelected = currentRoute == 'arlab_activity';
 
     return [
-      buildDrawerItem(DrawerMenuItem(title: 'Home', icon: Icons.home_outlined, route: 'home', onTap: () => navigate(const DashBoardPage())), currentRoute == 'home'),
-      buildDrawerItem(DrawerMenuItem(title: 'Courses', icon: Icons.menu_book_outlined, route: 'courses', onTap: () => navigate(const CoursesPage())), currentRoute == 'courses'),
-      buildDrawerItem(DrawerMenuItem(title: 'Tech Library', icon: Icons.computer_outlined, route: 'techlib', onTap: () => navigate(const TechLibraryPage())), currentRoute == 'techlib'),
-      buildDrawerItem(DrawerMenuItem(title: 'Knowledge Lab', icon: Icons.science_outlined, route: 'knowledge', onTap: () => navigate(const KnowledgeLabPage())), currentRoute == 'knowledge'),
+      buildDrawerItem(DrawerMenuItem(title: 'Home', icon: Icons.home_outlined, route: 'home', onTap: () => navigate(const DashBoardPage(), 'home')), currentRoute == 'home'),
+      buildDrawerItem(DrawerMenuItem(title: 'Courses', icon: Icons.menu_book_outlined, route: 'courses', onTap: () => navigate(const CoursesPage(), 'courses')), currentRoute == 'courses'),
+      buildDrawerItem(DrawerMenuItem(title: 'Tech Library', icon: Icons.computer_outlined, route: 'techlib', onTap: () => navigate(const TechLibraryPage(), 'techlib')), currentRoute == 'techlib'),
+      buildDrawerItem(DrawerMenuItem(title: 'Knowledge Lab', icon: Icons.science_outlined, route: 'knowledge', onTap: () => navigate(const KnowledgeLabPage(), 'knowledge')), currentRoute == 'knowledge'),
       
       // AR Lab Dropdown-like Expansion
       GestureDetector(
@@ -316,7 +327,10 @@ class AppDrawerBackend {
                   icon: Icons.play_circle_outline, 
                   route: 'arlab_activity', 
                   isEnabled: userProvider.isArSupported,
-                  onTap: () => navigate(const ArActivityPage())
+                  onTap: () {
+                    // AR activity usually stays as a full screen push
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ArActivityPage()));
+                  }
                 ), 
                 currentRoute == 'arlab_activity',
                 isSubItem: true
@@ -326,7 +340,7 @@ class AppDrawerBackend {
         ),
       ),
 
-      buildDrawerItem(DrawerMenuItem(title: 'Community Hub', icon: Icons.groups_outlined, route: 'community', onTap: () => navigate(const CommunityHubPage())), currentRoute == 'community'),
+      buildDrawerItem(DrawerMenuItem(title: 'Community Hub', icon: Icons.groups_outlined, route: 'community', onTap: () => navigate(const CommunityHubPage(), 'community')), currentRoute == 'community'),
     ];
   }
 

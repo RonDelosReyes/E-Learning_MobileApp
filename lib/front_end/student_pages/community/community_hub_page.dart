@@ -8,9 +8,12 @@ import '../../widgets/hamburgMenu.dart';
 import '../../widgets/student/community/create_post_modal.dart';
 import '../../widgets/student/community/post_card_widget.dart';
 import '../../widgets/student/community/comments_modal.dart';
+import '../../widgets/skeleton_widgets.dart';
+import '../../widgets/empty_state_widget.dart';
 
 class CommunityHubPage extends StatefulWidget {
-  const CommunityHubPage({super.key});
+  final bool isInsideShell;
+  const CommunityHubPage({super.key, this.isInsideShell = false});
 
   @override
   State<CommunityHubPage> createState() => _CommunityHubPageState();
@@ -69,6 +72,78 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
       builder: (context, communityProvider, child) {
         final filteredPosts = _getFilteredPosts(communityProvider.posts);
         final isLoading = communityProvider.isLoading;
+
+        Widget bodyContent = Column(
+          children: [
+            if (widget.isInsideShell)
+              Container(
+                color: gradient != null ? null : primaryColor,
+                decoration: gradient != null ? BoxDecoration(gradient: gradient) : null,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: "Search posts, authors, or categories...",
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                    prefixIcon: const Icon(Icons.search, color: Colors.white70, size: 20),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.15),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+            _buildCategoryFilter(communityProvider),
+            Expanded(
+              child: RefreshIndicator(
+                    onRefresh: () => _loadData(forceRefresh: true),
+                    child: (isLoading && communityProvider.posts.isEmpty)
+                      ? ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: 2,
+                          itemBuilder: (context, index) => const PostSkeleton(),
+                        )
+                      : filteredPosts.isEmpty
+                        ? const EmptyStateWidget(
+                            icon: Icons.forum_outlined,
+                            title: "The hub is quiet",
+                            description: "Be the first one to start a discussion! Share your thoughts or ask a question.",
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                            cacheExtent: 1000,
+                            itemCount: filteredPosts.length,
+                            itemBuilder: (context, index) => PostCardWidget(
+                              key: ValueKey(filteredPosts[index].postId),
+                              post: filteredPosts[index],
+                              onRefresh: () => _loadData(forceRefresh: true),
+                              onShowComments: () => _showCommentsModal(filteredPosts[index]),
+                            ),
+                          ),
+                  ),
+            ),
+          ],
+        );
+
+        if (widget.isInsideShell) {
+          return Scaffold(
+            backgroundColor: Colors.transparent,
+            floatingActionButton: FloatingActionButton(
+              onPressed: () => CreatePostModal.show(context, () => _loadData(forceRefresh: true)),
+              backgroundColor: primaryColor,
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: const Icon(Icons.add, color: Colors.white, size: 30),
+            ),
+            body: bodyContent,
+          );
+        }
 
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
@@ -132,36 +207,7 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: const Icon(Icons.add, color: Colors.white, size: 30),
           ),
-          body: Column(
-            children: [
-              _buildCategoryFilter(communityProvider),
-              Expanded(
-                child: Stack(
-                  children: [
-                    RefreshIndicator(
-                      onRefresh: () => _loadData(forceRefresh: true),
-                      child: filteredPosts.isEmpty && !isLoading
-                          ? const Center(child: Text("No posts found."))
-                          : ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                              cacheExtent: 1000,
-                              itemCount: filteredPosts.length,
-                              itemBuilder: (context, index) => PostCardWidget(
-                                key: ValueKey(filteredPosts[index].postId),
-                                post: filteredPosts[index],
-                                onRefresh: () => _loadData(forceRefresh: true),
-                                onShowComments: () => _showCommentsModal(filteredPosts[index]),
-                              ),
-                            ),
-                    ),
-                    if (isLoading && communityProvider.posts.isEmpty)
-                      Center(child: CircularProgressIndicator(color: primaryColor)),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          body: bodyContent,
         );
       },
     );
